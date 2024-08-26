@@ -2,7 +2,7 @@
 
 #include "Tech.h"
 
-namespace ruler {
+namespace phy {
 
 bool loadTech(Tech &dst, string path);
 

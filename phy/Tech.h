@@ -10,7 +10,7 @@ using namespace std;
 
 int flip(int idx);
 
-namespace ruler {
+namespace phy {
 
 // This structure represents a single GDS layer. There are often different
 // types of layers, but for us the most important are the draw, label, and pin

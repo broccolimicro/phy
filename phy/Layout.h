@@ -8,7 +8,7 @@
 
 using namespace std;
 
-namespace ruler {
+namespace phy {
 
 struct Layout;
 

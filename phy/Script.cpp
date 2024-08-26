@@ -5,7 +5,7 @@
 
 #include <wordexp.h>
 
-namespace ruler {
+namespace phy {
 
 Tech *tech;
 

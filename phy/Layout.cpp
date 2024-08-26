@@ -4,7 +4,7 @@
 
 using namespace std;
 
-namespace ruler {
+namespace phy {
 
 Rect::Rect() {
 	net = -1;

@@ -8,7 +8,7 @@ int flip(int idx) {
 	return -idx-1;
 }
 
-namespace ruler {
+namespace phy {
 
 Paint::Paint() {
 	this->name = "";
