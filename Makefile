@@ -1,5 +1,3 @@
-PYTHON_RELEASE = python$(shell python3 -c "import sys;sys.stdout.write('{}.{}'.format(sys.version_info[0],sys.version_info[1]))")
-
 NAME          = phy
 DEPEND        =
 
@@ -9,7 +7,7 @@ GTEST        := ../../googletest
 GTEST_I      := -I$(GTEST)/googletest/include -I.
 GTEST_L      := -L$(GTEST)/build/lib -L.
 
-CXXFLAGS	    = -std=c++14 -O2 -g -Wall -fmessage-length=0 $(DEPEND:%=-I../%) -I. -I/usr/include/$(PYTHON_RELEASE)
+CXXFLAGS	    = -std=c++14 -O2 -g -Wall -fmessage-length=0 $(DEPEND:%=-I../%) -I. $(shell python3-config --includes)
 LDFLAGS		    =  
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')
