@@ -21,7 +21,7 @@ TEST_DEPS    := $(shell mkdir -p build/$(TESTDIR); find build/$(TESTDIR) -name '
 TEST_TARGET   = test
 
 ifeq ($(OS),Windows_NT)
-    CXXFLAGS += -D WIN32 -I/usr/include
+    CXXFLAGS += -D WIN32
     ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
         CXXFLAGS += -D AMD64
     else

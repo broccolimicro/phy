@@ -1,9 +1,170 @@
 #include "Script.h"
 
+#include <dirent.h>
+#include <fnmatch.h>
+#include <pwd.h>
+
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#include <wordexp.h>
+std::string expandTilde(const std::string& input) {
+	if (input[0] == '~') {
+		std::string homeDir;
+
+		if (input.length() == 1 || input[1] == '/') {
+			// If the tilde is followed by a slash or it's just `~`, use the current user's home directory
+			const char* home = getenv("HOME");
+			if (!home) {
+				struct passwd* pw = getpwuid(getuid());
+				homeDir = pw->pw_dir;
+			} else {
+				homeDir = home;
+			}
+		}
+
+		return homeDir + input.substr(1);
+	}
+	return input;
+}
+
+std::string expandEnvVariables(const std::string& input) {
+	std::string output;
+	size_t pos = 0;
+	bool inEscape = false;
+
+	while (pos < input.size()) {
+		if (inEscape) {
+			// If we are in escape mode, just append the character literally
+			output += input[pos];
+			inEscape = false;
+			pos++;
+			continue;
+		}
+
+		if (input[pos] == '\\') {
+			// Escape sequence (e.g., \$), skip the backslash and escape the next char
+			inEscape = true;
+			pos++;
+		} else if (input[pos] == '$') {
+			size_t endPos = pos + 1;
+
+			if (endPos < input.size() && input[endPos] == '{') {
+				// Handle ${VAR} syntax
+				endPos++;  // Skip past '{'
+				size_t varEnd = input.find('}', endPos);
+				if (varEnd != std::string::npos) {
+					std::string varName = input.substr(endPos, varEnd - endPos);
+					const char* varValue = getenv(varName.c_str());
+
+					if (varValue) {
+						output += varValue;
+					}
+					pos = varEnd + 1;  // Move past '}'
+					continue;
+				}
+			} else {
+				// Handle $VAR syntax (without braces)
+				while (endPos < input.size() && (isalnum(input[endPos]) || input[endPos] == '_')) {
+					endPos++;
+				}
+
+				std::string varName = input.substr(pos + 1, endPos - pos - 1);
+				const char* varValue = getenv(varName.c_str());
+
+				if (varValue) {
+					output += varValue;
+				}
+
+				pos = endPos;
+				continue;
+			}
+		}
+
+		// Append literal characters
+		output += input[pos];
+		pos++;
+	}
+
+	return output;
+}
+
+std::vector<std::string> globFiles(const std::string& pattern) {
+	std::vector<std::string> matches;
+	std::string dirPath = ".";
+
+	size_t lastSlash = pattern.find_last_of('/');
+	if (lastSlash != std::string::npos) {
+		dirPath = pattern.substr(0, lastSlash);
+	}
+
+	std::string filePattern = pattern.substr(lastSlash + 1);
+	DIR* dir = opendir(dirPath.c_str());
+	if (dir == nullptr) return matches;
+
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		if (fnmatch(filePattern.c_str(), entry->d_name, 0) == 0) {
+			matches.push_back(dirPath + "/" + entry->d_name);
+		}
+	}
+	closedir(dir);
+	return matches;
+}
+
+std::vector<std::string> splitArguments(const std::string& input) {
+	std::vector<std::string> args;
+	std::string current;
+	bool inSingleQuotes = false;
+	bool inDoubleQuotes = false;
+	bool inEscape = false;
+
+	for (size_t i = 0; i < input.size(); i++) {
+		char c = input[i];
+
+		if (inEscape) {
+			current += c;
+			inEscape = false;
+		} else if (c == '\\') {
+			inEscape = true;
+		} else if (c == '\'' && !inDoubleQuotes) {
+			inSingleQuotes = !inSingleQuotes;
+		} else if (c == '"' && !inSingleQuotes) {
+			inDoubleQuotes = !inDoubleQuotes;
+		} else if (isspace(c) && !inSingleQuotes && !inDoubleQuotes) {
+			if (!current.empty()) {
+				args.push_back(current);
+				current.clear();
+			}
+		} else {
+			current += c;
+		}
+	}
+
+	if (!current.empty()) {
+		args.push_back(current);
+	}
+
+	return args;
+}
+
+std::vector<std::string> wordExpand(const std::string& input) {
+	std::vector<std::string> args = splitArguments(input);
+	std::vector<std::string> expandedArgs;
+
+	for (auto& arg : args) {
+		arg = expandTilde(arg);
+		arg = expandEnvVariables(arg);
+
+		if (arg.find('*') != std::string::npos || arg.find('?') != std::string::npos) {
+			std::vector<std::string> globbedFiles = globFiles(arg);
+			expandedArgs.insert(expandedArgs.end(), globbedFiles.begin(), globbedFiles.end());
+		} else {
+			expandedArgs.push_back(arg);
+		}
+	}
+
+	return expandedArgs;
+}
 
 namespace phy {
 
@@ -214,22 +375,14 @@ bool loadTech(Tech &dst, string path) {
 	PyConfig config;
 	PyConfig_InitPythonConfig(&config);
 
-	wordexp_t args;
-	if (wordexp(path.c_str(), &args, WRDE_APPEND) != 0) {
-		return false;
+	vector<string> args = wordExpand(path);
+	vector<char*> argv;
+	for (auto arg = args.begin(); arg != args.end(); arg++) {
+		argv.push_back(const_cast<char*>(arg->c_str()));
 	}
 
-	int argc = args.we_wordc + 1;
-	char **argv = new char*[argc];
-	argv[0] = args.we_wordv[0];
-	for (int i = 0; i < (int)args.we_wordc; i++) {
-		argv[i+1] = args.we_wordv[i];
-	}
-
-	PyStatus status = PyConfig_SetBytesArgv(&config, argc, argv);
+	PyStatus status = PyConfig_SetBytesArgv(&config, argv.size(), argv.data());
 	if (PyStatus_Exception(status)) {
-		wordfree(&args);
-		delete [] argv;
 		tech = nullptr;
 		PyConfig_Clear(&config);
 		if (not PyStatus_IsExit(status)) {
@@ -241,8 +394,6 @@ bool loadTech(Tech &dst, string path) {
 	PyImport_AppendInittab("floret", &PyInit_floret);
 	status = Py_InitializeFromConfig(&config);
 	if (PyStatus_Exception(status)) {
-		wordfree(&args);
-		delete [] argv;
 		tech = nullptr;
 		PyConfig_Clear(&config);
 		if (not PyStatus_IsExit(status)) {
@@ -253,15 +404,13 @@ bool loadTech(Tech &dst, string path) {
 	PyConfig_Clear(&config);
 
 	bool success = true;
-	FILE *fptr = fopen(args.we_wordv[0], "r");
+	FILE *fptr = fopen(argv[0], "r");
 	if (fptr != nullptr) {
-		PyRun_SimpleFile(fptr, args.we_wordv[0]);
+		PyRun_SimpleFile(fptr, argv[0]);
 		fclose(fptr);
 		success = (Py_FinalizeEx() >= 0);
 	}
 
-	delete [] argv;
-	wordfree(&args);
 	tech = nullptr;
 	return success;
 }
