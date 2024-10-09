@@ -357,7 +357,7 @@ int Tech::findPaint(string name) const {
 
 int Tech::findPaint(int major, int minor) const {
 	for (int i = 0; i < (int)paint.size(); i++) {
-		if (paint[i].major and paint[i].minor == minor) {
+		if (paint[i].major == major and paint[i].minor == minor) {
 			return i;
 		}
 	}
