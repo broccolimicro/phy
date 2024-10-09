@@ -9,13 +9,17 @@ using namespace std;
 namespace phy {
 
 struct Library {
-	Library();
-	Library(const Tech *tech);
+	Library(const Tech &tech, string libPath="");
+	Library(const Library &copy);
 	~Library();
 
-	const Tech *tech;
+	Library &operator=(const Library &copy);
 
-	vector<Layout> cells; 
+	const Tech &tech;
+	
+	string libPath;
+
+	vector<Layout> macros; 
 };
 
 }

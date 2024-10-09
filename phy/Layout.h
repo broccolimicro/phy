@@ -52,14 +52,19 @@ bool operator<(const Bound &b0, const Bound &b1);
 bool operator<(const Bound &b, int p);
 
 struct Layer {
-	Layer();
-	Layer(bool value);
+	Layer(const Tech &tech);
+	Layer(const Tech &tech, bool value);
 	Layer(const Tech &tech, int draw, int label = -1, int pin = -1);
+	Layer(const Layer &copy);
 	~Layer();
+
+	Layer &operator=(const Layer &copy);
 
 	enum {
 		UNKNOWN = -1,
 	};
+
+	const Tech &tech;
 
 	// this is the source of truth
 	// index into layer stack defined in Tech
@@ -81,7 +86,7 @@ struct Layer {
 
 	////////////////////////////////////////////
 
-	bool isFill(const Tech &tech);
+	bool isFill();
 
 	void clear();
 	void sync() const;
@@ -125,7 +130,10 @@ struct Layout {
 	// Layout(); we shouldn't be able to create a layout without a pointer to the
 	// technology node specification
 	Layout(const Tech &tech);
+	Layout(const Layout &copy);
 	~Layout();
+
+	Layout &operator=(const Layout &copy);
 
 	// used in the minOffset() functions for substrateMode and routingMode
 	enum {
@@ -135,7 +143,7 @@ struct Layout {
 	};
 
 	// The technology node specification with the DRC rules
-	const Tech *tech;
+	const Tech &tech;
 
 	// The name of the cell in the cell library
 	string name;
