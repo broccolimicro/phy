@@ -126,6 +126,19 @@ struct Evaluation {
 	void evaluate();
 };
 
+struct Port {
+	Port();
+	Port(string name, bool isInput=false, bool isOutput=false, bool isVdd=false, bool isGND=false, bool isSub=false);
+	~Port();
+
+	string name;
+	bool isInput;
+	bool isOutput;
+	bool isVdd;
+	bool isGND;
+	bool isSub;
+};
+
 struct Layout {
 	// Layout(); we shouldn't be able to create a layout without a pointer to the
 	// technology node specification
@@ -151,7 +164,7 @@ struct Layout {
 	Rect box;
 
 	// The names for all of the nets
-	vector<string> nets;
+	vector<Port> nets;
 
 	// The geometry for this cell
 	vector<Layer> layers;

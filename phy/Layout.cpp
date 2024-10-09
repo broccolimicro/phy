@@ -572,6 +572,27 @@ void Evaluation::evaluate() {
 	}
 }
 
+Port::Port() {
+	name = "";
+	isInput = false;
+	isOutput = false;
+	isVdd = false;
+	isGND = false;
+	isSub = false;
+}
+
+Port::Port(string name, bool isInput, bool isOutput, bool isVdd, bool isGND, bool isSub) {
+	this->name = name;
+	this->isInput = isInput;
+	this->isOutput = isOutput;
+	this->isVdd = isVdd;
+	this->isGND = isGND;
+	this->isSub = isSub;
+}
+
+Port::~Port() {
+}
+
 /*Layout::Layout() {
 	tech = nullptr;
 	box = Rect();
