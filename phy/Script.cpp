@@ -3,6 +3,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
+#include <filesystem>
+
 std::vector<std::string> splitArguments(const std::string& input) {
 	std::vector<std::string> args;
 	std::string current;
@@ -244,6 +246,10 @@ static PyObject* PyInit_floret()
 
 bool loadTech(Tech &dst, string path) {
 	tech = &dst;
+
+	if (not filesystem::exists(path)) {
+		return false;
+	}
 
 	PyConfig config;
 	PyConfig_InitPythonConfig(&config);
