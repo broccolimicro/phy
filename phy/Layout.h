@@ -55,16 +55,13 @@ struct Layer {
 	Layer(const Tech &tech);
 	Layer(const Tech &tech, bool value);
 	Layer(const Tech &tech, int draw, int label = -1, int pin = -1);
-	Layer(const Layer &copy);
 	~Layer();
-
-	Layer &operator=(const Layer &copy);
 
 	enum {
 		UNKNOWN = -1,
 	};
 
-	const Tech &tech;
+	const Tech *tech;
 
 	// this is the source of truth
 	// index into layer stack defined in Tech
@@ -86,7 +83,7 @@ struct Layer {
 
 	////////////////////////////////////////////
 
-	bool isFill();
+	bool isFill() const;
 
 	void clear();
 	void sync() const;
@@ -109,12 +106,13 @@ Layer operator|(const Layer &l0, const Layer &l1);
 Layer operator~(const Layer &l);
 
 struct Evaluation {
-	Evaluation();
-	Evaluation(Layout &layout);
+	Evaluation(const Tech &tech);
+	Evaluation(const Layout &layout);
 	~Evaluation();
 
-	Layout *layout;
+	const Layout *layout;
 	// negative index into Tech::rules -> geometry
+	Layer empty;
 	map<int, Layer> layers;
 
 	// negative index into Tech::rules -> count of ready operands in layers
@@ -122,7 +120,8 @@ struct Evaluation {
 
 	void init();
 	bool has(int idx);
-	Layer &at(int idx);
+	const Layer &at(int idx) const;
+	Layer &set(int idx);
 	void evaluate();
 };
 
@@ -143,10 +142,7 @@ struct Layout {
 	// Layout(); we shouldn't be able to create a layout without a pointer to the
 	// technology node specification
 	Layout(const Tech &tech);
-	Layout(const Layout &copy);
 	~Layout();
-
-	Layout &operator=(const Layout &copy);
 
 	// used in the minOffset() functions for substrateMode and routingMode
 	enum {
@@ -156,7 +152,7 @@ struct Layout {
 	};
 
 	// The technology node specification with the DRC rules
-	const Tech &tech;
+	const Tech *tech;
 
 	// The name of the cell in the cell library
 	string name;
@@ -184,8 +180,8 @@ struct Layout {
 	void clear();
 };
 
-bool minOffset(int *offset, const Tech &tech, int axis, Layer &l0, int l0Shift, Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true);
-bool minOffset(int *offset, const Tech &tech, int axis, Layout &left, int leftShift, Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true);
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true);
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true);
 
 }
 

@@ -4,21 +4,12 @@ using namespace std;
 
 namespace phy {
 
-Library::Library(const Tech &tech, string libPath) : tech(tech) {
+Library::Library(const Tech &tech, string libPath) {
 	this->libPath = libPath;
-}
-
-Library::Library(const Library &copy) : tech(copy.tech) {
-	libPath = copy.libPath;
-	macros = copy.macros;
+	this->tech = &tech;
 }
 
 Library::~Library() {
-}
-
-Library &Library::operator=(const Library &copy) {
-	macros = copy.macros;
-	return *this;
 }
 
 }
