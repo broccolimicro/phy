@@ -167,6 +167,7 @@ struct Tech {
 	// Scale of integer units in micrometers for each rectangle
 	// in the Layout.
 	double dbunit;
+	double scale;
 
 	// index into Tech::paint to represent the cell boundary layer
 	int boundary;
@@ -203,6 +204,7 @@ struct Tech {
 	int getNotInteract(int l0, int l1) const;
 	int setNotInteract(int l0, int l1);
 
+	int spacingIdx(int l0, int l1) const;
 	int getSpacing(int l0, int l1) const;
 	int setSpacing(int l0, int l1, int value);
 

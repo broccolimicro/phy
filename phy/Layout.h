@@ -94,6 +94,11 @@ struct Layer {
 
 	Rect bbox() const;
 	void merge(bool doSync=false);
+
+	Layer clamp(int axis, int lo, int hi) const;
+	Layer &shift(vec2i pos, vec2i dir=vec2i(1,1));
+
+	Layer &fillSpacing();
 };
 
 bool operator<(const Layer &l0, const Layer &l1);
@@ -129,6 +134,9 @@ struct Port {
 	Port();
 	Port(string name, bool isInput=false, bool isOutput=false, bool isVdd=false, bool isGND=false, bool isSub=false);
 	~Port();
+
+	int label;
+	vec2i pos;
 
 	string name;
 	bool isInput;

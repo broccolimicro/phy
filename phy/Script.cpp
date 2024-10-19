@@ -55,6 +55,17 @@ static PyObject* py_dbunit(PyObject *self, PyObject *args) {
 	return PyFloat_FromDouble(dbunit);
 }
 
+static PyObject* py_scale(PyObject *self, PyObject *args) {
+	double scale = -1;
+	if(!PyArg_ParseTuple(args, "d:scale", &scale)) {
+		return NULL;
+	}
+
+	tech->scale = scale;
+	return PyFloat_FromDouble(scale);
+}
+
+
 static PyObject* py_paint(PyObject *self, PyObject *args) {
 	const char *name = 0;
 	int major = -1;
@@ -218,6 +229,7 @@ static PyObject* py_bound(PyObject *self, PyObject *args) {
 
 static PyMethodDef EmbMethods[] = {
 	{"dbunit", py_dbunit, METH_VARARGS, "Set the dbunit."},
+	{"scale", py_scale, METH_VARARGS, "Set the scale."},
 	{"paint", py_paint, METH_VARARGS, "Create a paint layer."},
 	{"width", py_width, METH_VARARGS, "Set the minimum width for a paint layer."},
 	{"fill", py_fill, METH_VARARGS, "Indicate a fill layer."},

@@ -115,6 +115,8 @@ bool Rule::isOperator() const {
 
 Tech::Tech() {
 	boundary = -1;
+	dbunit = 1.0;
+	scale = 1.0;
 }
 
 Tech::~Tech() {
@@ -287,7 +289,7 @@ int Tech::setNotInteract(int l0, int l1) {
 	return result;
 }
 
-int Tech::getSpacing(int l0, int l1) const {
+int Tech::spacingIdx(int l0, int l1) const {
 	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
 		return std::numeric_limits<int>::max();
 	}
@@ -300,9 +302,16 @@ int Tech::getSpacing(int l0, int l1) const {
 	return std::numeric_limits<int>::max();
 }
 
+int Tech::getSpacing(int l0, int l1) const {
+	int result = spacingIdx(l0, l1);
+	if (result < 0) {
+		return rules[flip(result)].params[0];
+	}
+	return 0;
+}
 
 int Tech::setSpacing(int l0, int l1, int value) {
-	int result = getSpacing(l0, l1);
+	int result = spacingIdx(l0, l1);
 	if (result < 0) {
 		int idx = flip(result);
 		if (value < rules[idx].params[0]) {

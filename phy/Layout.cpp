@@ -262,15 +262,17 @@ void Layer::sync() const {
 
 void Layer::push(Rect rect, bool doSync) {
 	int index = (int)geo.size();
-	geo.push_back(rect);
-	dirty = dirty or not doSync;
-	if (not dirty) {
-		for (int axis = 0; axis < 2; axis++) {
-			for (int fromTo = 0; fromTo < 2; fromTo++) {
-				vector<Bound> &bounds = bound[axis][fromTo];
+	if (rect.ll[0] < rect.ur[0] and rect.ll[1] < rect.ur[1]) {
+		geo.push_back(rect);
+		dirty = dirty or not doSync;
+		if (not dirty) {
+			for (int axis = 0; axis < 2; axis++) {
+				for (int fromTo = 0; fromTo < 2; fromTo++) {
+					vector<Bound> &bounds = bound[axis][fromTo];
 
-				auto loc = lower_bound(bounds.begin(), bounds.end(), rect[fromTo][axis]); 
-				bounds.insert(loc, Bound(rect[fromTo][axis], index));
+					auto loc = lower_bound(bounds.begin(), bounds.end(), rect[fromTo][axis]); 
+					bounds.insert(loc, Bound(rect[fromTo][axis], index));
+				}
 			}
 		}
 	}
@@ -278,7 +280,6 @@ void Layer::push(Rect rect, bool doSync) {
 
 void Layer::push(vector<Rect> rects, bool doSync) {
 	int index = (int)geo.size();
-	geo.reserve(geo.size()+rects.size());
 	geo.insert(geo.end(), rects.begin(), rects.end());
 	dirty = dirty or not doSync;
 	if (not dirty) {
@@ -340,6 +341,71 @@ void Layer::merge(bool doSync) {
 			}
 		}
 	}
+}
+
+Layer Layer::clamp(int axis, int lo, int hi) const {
+	Layer result(*tech, draw, label, pin);
+	result.isRouting = isRouting;
+	result.isSubstrate = isSubstrate;
+
+	for (auto r = geo.begin(); r != geo.end(); r++) {
+		Rect n = *r;
+		if (n.ll[axis] < lo) {
+			n.ll[axis] = lo;
+		}
+		if (n.ur[axis] > hi) {
+			n.ur[axis] = hi;
+		}
+		if (n.ll[axis] < n.ur[axis]) {
+			result.geo.push_back(n);
+			result.dirty = true;
+		}
+	}
+	return result;
+}
+
+Layer &Layer::shift(vec2i pos, vec2i dir) {
+	for (auto r = geo.begin(); r != geo.end(); r++) {
+		r->shift(pos, dir);
+	}
+	dirty = true;
+	return *this;
+}
+
+Layer &Layer::fillSpacing() {
+	int minSpacing = tech->getSpacing(draw, draw);
+	for (int i = (int)geo.size()-1; i >= 0; i--) {
+		auto ri = geo.begin()+i;
+		if (ri->net < 0) {
+			continue;
+		}
+
+		for (int j = i-1; j >= 0; j--) {
+			auto rj = geo.begin()+j;
+			if (ri->net != rj->net) {
+				continue;
+			}
+
+			if (rj->ll[1] < ri->ur[1] and ri->ll[1] < rj->ur[1]
+				and ((ri->ur[0] < rj->ll[0] and rj->ll[0] < ri->ur[0]+minSpacing)
+					or (rj->ur[0] < ri->ll[0] and ri->ll[0] < rj->ur[0]+minSpacing))) {
+				// horizontal spacing violation
+				push(Rect(ri->net,
+					vec2i(min(ri->ur[0], rj->ur[0]), max(ri->ll[1], rj->ll[1])),
+					vec2i(max(ri->ll[0], rj->ll[0]), min(ri->ur[1], rj->ur[1]))));
+			}
+
+			if (rj->ll[0] < ri->ur[0] and ri->ll[0] < rj->ur[0]
+				and ((ri->ur[1] < rj->ll[1] and rj->ll[1] < ri->ur[1]+minSpacing)
+					or (rj->ur[1] < ri->ll[1] and ri->ll[1] < rj->ur[1]+minSpacing))) {
+				// vertical spacing violation
+				push(Rect(ri->net,
+					vec2i(min(ri->ur[0], rj->ur[0]), max(ri->ll[1], rj->ll[1])),
+					vec2i(max(ri->ll[0], rj->ll[0]), min(ri->ur[1], rj->ur[1]))));
+			}
+		}
+	}
+	return *this;
 }
 
 bool operator<(const Layer &l0, const Layer &l1) {
@@ -562,6 +628,7 @@ void Evaluation::evaluate() {
 }
 
 Port::Port() {
+	label = -1;
 	name = "";
 	isInput = false;
 	isOutput = false;
@@ -571,6 +638,7 @@ Port::Port() {
 }
 
 Port::Port(string name, bool isInput, bool isOutput, bool isVdd, bool isGND, bool isSub) {
+	this->label = -1;
 	this->name = name;
 	this->isInput = isInput;
 	this->isOutput = isOutput;
