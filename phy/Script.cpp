@@ -101,62 +101,114 @@ static PyObject* py_fill(PyObject *self, PyObject *args) {
 }
 
 static PyObject* py_nmos(PyObject *self, PyObject *args) {
+	const char *variant = 0;
 	const char *name = 0;
-	int overhang = -1;
-	if(!PyArg_ParseTuple(args, "si:nmos", &name, &overhang)) {
+	
+	PyObject *pList;
+	PyObject *pItem;
+	Py_ssize_t n;
+
+	if(!PyArg_ParseTuple(args, "ssO!:nmos", &variant, &name, &PyList_Type, &pList)) {
 		return NULL;
 	}
 
-	int result = flip((int)tech->models.size());
-	tech->models.push_back(Model(Model::NMOS, name, overhang));
+	vector<int> stack;
+	n = PyList_Size(pList);
+	for (int i = 0; i < n; i++) {
+		pItem = PyList_GetItem(pList, i);
+		if(!PyLong_Check(pItem)) {
+				PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+				return NULL;
+		}
+		stack.push_back(PyLong_AsLong(pItem));
+	}
+	
+	printf("loaded model %s %s {", variant, name);
+	for (int i = 0; i < (int)stack.size(); i++) {
+		printf("%d ", stack[i]);
+	}
+	printf("}\n");
+
+	int result = flip(tech->models.size());
+	tech->models.push_back(Model(Model::NMOS, variant, name, stack));
 	return PyLong_FromLong(result);
 }
 
+
 static PyObject* py_pmos(PyObject *self, PyObject *args) {
+	const char *variant = 0;
 	const char *name = 0;
-	int overhang = -1;
-	if(!PyArg_ParseTuple(args, "si:pmos", &name, &overhang)) {
+	
+	PyObject *pList;
+	PyObject *pItem;
+	Py_ssize_t n;
+
+	if(!PyArg_ParseTuple(args, "ssO!:pmos", &variant, &name, &PyList_Type, &pList)) {
 		return NULL;
 	}
 
-	int result = flip((int)tech->models.size());
-	tech->models.push_back(Model(Model::PMOS, name, overhang));
+	vector<int> stack;
+	n = PyList_Size(pList);
+	for (int i = 0; i < n; i++) {
+		pItem = PyList_GetItem(pList, i);
+		if(!PyLong_Check(pItem)) {
+				PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+				return NULL;
+		}
+		stack.push_back(PyLong_AsLong(pItem));
+	}
+
+	printf("loaded model %s %s {", variant, name);
+	for (int i = 0; i < (int)stack.size(); i++) {
+		printf("%d ", stack[i]);
+	}
+	printf("}\n");
+
+	int result = flip(tech->models.size());
+	tech->models.push_back(Model(Model::PMOS, variant, name, stack));
 	return PyLong_FromLong(result);
 }
 
 static PyObject* py_subst(PyObject *self, PyObject *args) {
-	int model = -1;
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	int overhangX = 0;
-	int overhangY = 0;
-	if(!PyArg_ParseTuple(args, "iiiiii:subst", &model, &draw, &label, &pin, &overhangX, &overhangY)) {
+	if(!PyArg_ParseTuple(args, "i|ii:subst", &draw, &label, &pin)) {
 		return NULL;
 	}
 
-	model = flip(model);
-	int result = (int)tech->models[model].paint.size();
-	tech->models[model].paint.push_back(Diffusion(draw, label, pin, vec2i(overhangX, overhangY)));
+	int result = flip((int)tech->subst.size());
+	tech->subst.push_back(Diffusion(draw, label, pin, false));
+	printf("subst:%d (%d %d %d)\n", result, draw, label, pin);
+	return PyLong_FromLong(result);
+}
+
+static PyObject* py_well(PyObject *self, PyObject *args) {
+	int draw = -1;
+	int label = -1;
+	int pin = -1;
+	if(!PyArg_ParseTuple(args, "i|ii:well", &draw, &label, &pin)) {
+		return NULL;
+	}
+
+	int result = flip((int)tech->subst.size());
+	tech->subst.push_back(Diffusion(draw, label, pin, true));
+	printf("well:%d (%d %d %d)\n", result, draw, label, pin);
 	return PyLong_FromLong(result);
 }
 
 static PyObject* py_via(PyObject *self, PyObject *args) {
+	int dn = -1;
+	int up = -1;
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	int downLevel = -1;
-	int upLevel = -1;
-	int downLo = 0;
-	int downHi = 0;
-	int upLo = 0;
-	int upHi = 0;
-	if(!PyArg_ParseTuple(args, "iiiiiiiii:via", &draw, &label, &pin, &downLevel, &upLevel, &downLo, &downHi, &upLo, &upHi)) {
+	if(!PyArg_ParseTuple(args, "iii|ii:via", &dn, &up, &draw, &label, &pin)) {
 		return NULL;
 	}
 
 	int result = (int)tech->vias.size();
-	tech->vias.push_back(Via(draw, label, pin, downLevel, upLevel, downLo, downHi, upLo, upHi));
+	tech->vias.push_back(Via(dn, up, draw, label, pin));
 	return PyLong_FromLong(result);
 }
 
@@ -164,7 +216,7 @@ static PyObject* py_route(PyObject *self, PyObject *args) {
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	if(!PyArg_ParseTuple(args, "iii:route", &draw, &label, &pin)) {
+	if(!PyArg_ParseTuple(args, "i|ii:route", &draw, &label, &pin)) {
 		return NULL;
 	}
 
@@ -182,6 +234,23 @@ static PyObject* py_spacing(PyObject *self, PyObject *args) {
 	}
 
 	int result = tech->setSpacing(l0, l1, value);
+	return PyLong_FromLong(result);
+}
+
+static PyObject* py_enclosing(PyObject *self, PyObject *args) {
+	int l0 = -1;
+	int l1 = -1;
+	int lo = -1;
+	int hi = -1;
+	if(!PyArg_ParseTuple(args, "iii|i:enclosing", &l0, &l1, &lo, &hi)) {
+		return NULL;
+	}
+
+	int result = tech->setEnclosing(l0, l1, lo, hi);
+
+	printf("enclosing %d around %d: (%d,%d)\n", l0, l1, lo, hi);
+	tech->print(result);
+
 	return PyLong_FromLong(result);
 }
 
@@ -235,10 +304,12 @@ static PyMethodDef EmbMethods[] = {
 	{"fill", py_fill, METH_VARARGS, "Indicate a fill layer."},
 	{"nmos", py_nmos, METH_VARARGS, "Create an nmos transistor model."},
 	{"pmos", py_pmos, METH_VARARGS, "Create a pmos transistor model."},
-	{"subst", py_subst, METH_VARARGS, "Add a diffusion layer to the bottom of a model."},
+	{"subst", py_subst, METH_VARARGS, "Define a diffusion layer."},
+	{"well", py_well, METH_VARARGS, "Define a well layer."},
 	{"via", py_via, METH_VARARGS, "Add a via model."},
 	{"route", py_route, METH_VARARGS, "Add a route model."},
 	{"spacing", py_spacing, METH_VARARGS, "Add a spacing rule."},
+	{"enclosing", py_enclosing, METH_VARARGS, "Add an enclosing rule."},
 	{"b_and", py_b_and, METH_VARARGS, "Intersect two layers."},
 	{"b_or", py_b_or, METH_VARARGS, "Union between two layers."},
 	{"b_not", py_b_not, METH_VARARGS, "Complement of a layer."},

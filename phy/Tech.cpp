@@ -45,26 +45,27 @@ Material::~Material() {
 }
 
 Diffusion::Diffusion() : Material() {
-	overhang = vec2i(0,0);
+	isWell = false;
 }
 
-Diffusion::Diffusion(int draw, int label, int pin, vec2i overhang) : Material(draw, label, pin) {
-	this->overhang = overhang;
+Diffusion::Diffusion(int draw, int label, int pin, bool isWell) : Material(draw, label, pin) {
+	this->isWell = isWell;
 }
 
 Diffusion::~Diffusion() {
 }
 
 Model::Model() {
+	variant = "";
 	name = "";
 	type = NMOS;
-	polyOverhang = 0;
 }
 
-Model::Model(int type, string name, int polyOverhang) {
+Model::Model(int type, string variant, string name, vector<int> stack) {
+	this->variant = variant;
 	this->name = name;
 	this->type = type;
-	this->polyOverhang = polyOverhang;
+	this->stack = stack;
 }
 
 Model::~Model() {
@@ -82,15 +83,11 @@ Routing::~Routing() {
 Via::Via() : Material() {
 	upLevel = 0;
 	downLevel = 0;
-	dn = vec2i(0,0);
-	up = vec2i(0,0);
 }
 
-Via::Via(int draw, int label, int pin, int downLevel, int upLevel, int downLo, int downHi, int upLo, int upHi) : Material(draw, label, pin) {
+Via::Via(int downLevel, int upLevel, int draw, int label, int pin) : Material(draw, label, pin) {
 	this->downLevel = downLevel;
 	this->upLevel = upLevel;
-	this->dn = vec2i(downLo, downHi);
-	this->up = vec2i(upLo, upHi);
 }
 
 Via::~Via() {
@@ -289,13 +286,13 @@ int Tech::setNotInteract(int l0, int l1) {
 	return result;
 }
 
-int Tech::spacingIdx(int l0, int l1) const {
+int Tech::ruleIdx(int type, int l0, int l1) const {
 	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
 		return std::numeric_limits<int>::max();
 	}
 
 	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::SPACING and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1 and (int)rules[i].params.size() == 1) {
+		if (rules[i].type == type and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
 			return flip(i);
 		}
 	}
@@ -303,7 +300,7 @@ int Tech::spacingIdx(int l0, int l1) const {
 }
 
 int Tech::getSpacing(int l0, int l1) const {
-	int result = spacingIdx(l0, l1);
+	int result = ruleIdx(Rule::SPACING, l0, l1);
 	if (result < 0) {
 		return rules[flip(result)].params[0];
 	}
@@ -311,8 +308,8 @@ int Tech::getSpacing(int l0, int l1) const {
 }
 
 int Tech::setSpacing(int l0, int l1, int value) {
-	int result = spacingIdx(l0, l1);
-	if (result < 0) {
+	int result = ruleIdx(Rule::SPACING, l0, l1);
+	if (result != std::numeric_limits<int>::max()) {
 		int idx = flip(result);
 		if (value < rules[idx].params[0]) {
 			rules[idx].params[0] = value;
@@ -335,6 +332,53 @@ int Tech::setSpacing(int l0, int l1, int value) {
 	return result;
 }
 
+vec2i Tech::getEnclosing(int l0, int l1) const {
+	int result = ruleIdx(Rule::ENCLOSING, l0, l1);
+	if (result < 0) {
+		vector<int> params = rules[flip(result)].params;
+		if ((int)params.size() == 1) {
+			return vec2i(-1, params[0]);
+		} else if ((int)params.size() >= 2) {
+			return vec2i(params[0], params[1]);
+		}
+	}
+	return vec2i(-1, -1);
+}
+
+// -1 means that one of the sides doesn't need to be enclosed (extension)
+int Tech::setEnclosing(int l0, int l1, int lo, int hi) {
+	int result = ruleIdx(Rule::ENCLOSING, l0, l1);
+	if (result != std::numeric_limits<int>::max()) {
+		int idx = flip(result);
+		if (rules[idx].params.empty()) {
+			rules[idx].params.push_back(lo);
+		} else if (lo < rules[idx].params[0]) {
+			rules[idx].params[0] = lo;
+		}
+		if ((int)rules[idx].params.size() < 2) {
+			rules[idx].params.push_back(hi);
+		} else if (hi < rules[idx].params[1]) {
+			rules[idx].params[1] = hi;
+		}
+		return result;
+	}
+
+	result = flip((int)rules.size());
+	rules.push_back(Rule(Rule::ENCLOSING, {l0, l1}, {lo, hi}));
+	if (l0 >= 0) {
+		paint[l0].out.push_back(result);
+	} else {
+		rules[flip(l0)].out.push_back(result);
+	}
+	if (l1 >= 0) {
+		paint[l1].out.push_back(result);
+	} else {
+		rules[flip(l1)].out.push_back(result);
+	}
+	return result;
+}
+
+
 string Tech::print(int layer) const {
 	if (layer >= 0) {
 		return paint[layer].name;
@@ -348,6 +392,7 @@ string Tech::print(int layer) const {
 	case Rule::INTERACT: return "interact(" + print(rule.operands[0]) + "," + print(rule.operands[1]) + ")";
 	case Rule::NOT_INTERACT: return "not_interact(" + print(rule.operands[0]) + "," + print(rule.operands[1]) + ")";
 	case Rule::SPACING:  return print(rule.operands[0]) + "<->" + print(rule.operands[1]);
+	case Rule::ENCLOSING:  return "enclosing(" + print(rule.operands[0]) + "," + print(rule.operands[1]) + ")";
 	default: printf("%s:%d error: unsupported operation (rule[%d].type=%d).\n", __FILE__, __LINE__, flip(layer), rule.type);
 	}
 	return "";
@@ -434,11 +479,9 @@ bool Tech::isRouting(int layer) const {
 }
 
 bool Tech::isSubstrate(int layer) const {
-	for (auto model = models.begin(); model != models.end(); model++) {
-		for (auto diff = model->paint.begin(); diff != model->paint.end(); diff++) {
-			if (layer == diff->draw) {
-				return true;
-			}
+	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
+		if (layer == mat->draw) {
+			return true;
 		}
 	}
 

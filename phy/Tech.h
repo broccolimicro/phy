@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <array>
 #include <map>
 
 #include "vector.h"
@@ -38,7 +39,7 @@ struct Paint {
 // different purposes.
 struct Material {
 	Material();
-	Material(int draw, int label, int pin);
+	Material(int draw, int label=-1, int pin=-1);
 	~Material();
 	
 	// these index into Tech::paint
@@ -50,26 +51,16 @@ struct Material {
 // This specifies a diffusion layer for drawing transistors
 struct Diffusion : Material {
 	Diffusion();
-	Diffusion(int draw, int label, int pin, vec2i overhang);
+	Diffusion(int draw, int label=-1, int pin=-1, bool isWell=false);
 	~Diffusion();
 
-	// overhang distance beyond next higher layer
-	//  _____
-	// |  _  |<-- overhang[1]
-	// | |_| |
-	// |_____|
-	//  ^
-	//  | overhang[0]
-	//
-	// If this is the top-most diffusion layer, then overhang[0] represents the
-	// overhang beyond poly and overhang[1] should be 0.
-	vec2i overhang;
+	bool isWell;
 };
 
 // This structure records how to draw a transistor
 struct Model {
 	Model();
-	Model(int type, string name, int polyOverhang);
+	Model(int type, string variant, string name, vector<int> stack);
 	~Model();
 
 	// Type of transistor (nmos or pmos)
@@ -79,19 +70,14 @@ struct Model {
 	};
 	int type;
 	
+	string variant;
+
 	// Name of the device in the PDK, this is used to parse the spice file.
 	string name;
 
 	// All of the diffusion layers starting top down
-	vector<Diffusion> paint;
-
-	// Overhang of poly beyond the diffusion
-	//     _
-	//  __| |__ <-- polyOverhang
-	// |  | |  |
-	// |__| |__|
-	//    |_|
-	int polyOverhang;
+	// index into Tech::subst
+	vector<int> stack;
 };
 
 // This represents a routing layer for drawing wires to connect transistor
@@ -105,18 +91,14 @@ struct Routing : Material {
 // Connect two layers with a via
 struct Via : Material {
 	Via();
-	Via(int draw, int label, int pin, int downLevel, int upLevel, int downLo = 0, int downHi = 0, int upLo = 0, int upHi = 0);
+	Via(int downLevel, int upLevel, int draw, int label=-1, int pin=-1);
 	~Via();
 
 	// index into Tech::wires when >= 0
-	// index into Tech::models when < 0
+	// index into Tech::subst when < 0
 	// use flip() to access the index when negative.
 	int downLevel;
 	int upLevel;
-
-	// asymmetric enclosure rules with index 1 being the longer of the two
-	vec2i dn;
-	vec2i up;	
 };
 
 // This implements a DRC operation on the geometry. There are 3 kinds of DRC
@@ -135,6 +117,7 @@ struct Rule {
 		INTERACT = 3,
 		NOT_INTERACT = 4,
 		SPACING = 5,
+		ENCLOSING = 6
 		// TODO implement remaining DRC checks
 		// EDGES, WITH/WITHOUT_AREA, WITH/WITHOUT_LENGTH,
 		// ENCLOSING, ONGRID, WIDTH, GROW, SHRINK
@@ -189,6 +172,9 @@ struct Tech {
 	// interconnect) at index 1, then the metal layers (m1, m2, m3, ...)
 	vector<Routing> wires;
 
+	// The diffusion and well layers (substrate)
+	vector<Diffusion> subst;
+
 	// the list of all DRC rules that we need to check. See Rule for more
 	// information.
 	vector<Rule> rules;
@@ -204,9 +190,11 @@ struct Tech {
 	int getNotInteract(int l0, int l1) const;
 	int setNotInteract(int l0, int l1);
 
-	int spacingIdx(int l0, int l1) const;
+	int ruleIdx(int type, int l0, int l1) const;
 	int getSpacing(int l0, int l1) const;
 	int setSpacing(int l0, int l1, int value);
+	vec2i getEnclosing(int l0, int l1) const;
+	int setEnclosing(int l0, int l1, int lo, int hi);
 
 	string print(int layer) const;
 	int findPaint(string name) const;

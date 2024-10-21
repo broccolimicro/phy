@@ -539,7 +539,9 @@ Evaluation::Evaluation(const Layout &layout) : empty(*layout.tech) {
 Evaluation::~Evaluation() {
 }
 
-void Evaluation::init() { layers.clear(); incomplete.clear();
+void Evaluation::init() {
+	layers.clear();
+	incomplete.clear();
 	// Do the stupid thing first.
 
 	// TODO(edward.bingham) Really, we should identify all of the DRC rules that
@@ -899,22 +901,22 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 			//printf("matched rule %d i0=%d i1=%d: %s\n", i0->first, i0->second, i1->second, tech->print(i0->first).c_str());
 			const Rule &rule = left.tech->rules[flip(i0->first)];
 
-			vec2i spacing(rule.params[0], rule.params[0]);
-
-			// TODO(edward.bingham) This is a hack. Really, we need to understand a
-			// more complicated relationship between additive and subtractive
-			// expressions in DRC spacing rules, then apply the subtractive piece of
-			// the expression on one side to the addive piece on the other to
-			// understand whether that additive part actually represents a potential
-			// spacing violation. Realistically, this is only affecting transistor
-			// spacing on the stack, and so we can just turn off the horizontal
-			// spacing rules to prevent the problematic conflicts in those spacing
-			// rules. See pages 201-204 of notes
-			if (not horizSpacing) {
-				spacing[1-axis] = 0;
-			}
-
 			if (rule.type == Rule::SPACING) {
+				vec2i spacing(rule.params[0], rule.params[0]);
+
+				// TODO(edward.bingham) This is a hack. Really, we need to understand a
+				// more complicated relationship between additive and subtractive
+				// expressions in DRC spacing rules, then apply the subtractive piece of
+				// the expression on one side to the addive piece on the other to
+				// understand whether that additive part actually represents a potential
+				// spacing violation. Realistically, this is only affecting transistor
+				// spacing on the stack, and so we can just turn off the horizontal
+				// spacing rules to prevent the problematic conflicts in those spacing
+				// rules. See pages 201-204 of notes
+				if (not horizSpacing) {
+					spacing[1-axis] = 0;
+				}
+
 				if (e0.has(rule.operands[0]) and e1.has(rule.operands[1])) {
 					const Layer &l0 = e0.at(rule.operands[0]);
 					const Layer &l1 = e1.at(rule.operands[1]);
