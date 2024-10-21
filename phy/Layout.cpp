@@ -324,9 +324,16 @@ Rect Layer::bbox() const {
 		return Rect();
 	}
 	
+	bool conflict = false;
 	// DESIGN(edward.bingham) Naive approach first
 	Rect box(-1, geo[0].ll, geo[0].ur);
 	for (int i = 1; i < (int)geo.size(); i++) {
+		if (box.net < 0 and not conflict) {
+			box.net = geo[i].net;
+		} else if (geo[i].net >= 0 and geo[i].net != box.net) {
+			box.net = -1;
+			conflict = true;
+		}
 		box.bound(geo[i].ll, geo[i].ur);
 	}
 	return box;
@@ -920,12 +927,12 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 				if (e0.has(rule.operands[0]) and e1.has(rule.operands[1])) {
 					const Layer &l0 = e0.at(rule.operands[0]);
 					const Layer &l1 = e1.at(rule.operands[1]);
-				
-					int leftMode = (l0.isRouting ? routingMode : (l0.isSubstrate ? substrateMode : Layout::DEFAULT));
-					int rightMode = (l1.isRouting ? routingMode : (l1.isSubstrate ? substrateMode : Layout::DEFAULT));
+			
+					int leftMode = (l0.isRouting ? routingMode : (l0.isSubstrate ? (l0.isFill() ? Layout::MERGENET : substrateMode) : Layout::DEFAULT));
+					int rightMode = (l1.isRouting ? routingMode : (l1.isSubstrate ? (l1.isFill() ? Layout::MERGENET : substrateMode) : Layout::DEFAULT));
 					//printf("found e0 <-> e1: %d %d\n", leftMode, rightMode);
 
-					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE and (not l0.isFill() or not l1.isFill())) {
+					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
 						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET);
 						/*if (newConflict) {
 							printf("found conflict: %d\n", *offset);
@@ -940,11 +947,11 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 					const Layer &l0 = e0.at(rule.operands[1]);
 					const Layer &l1 = e1.at(rule.operands[0]);
 					
-					int leftMode = (l0.isRouting ? routingMode : (l0.isSubstrate ? substrateMode : Layout::DEFAULT));
-					int rightMode = (l1.isRouting ? routingMode : (l1.isSubstrate ? substrateMode : Layout::DEFAULT));
+					int leftMode = (l0.isRouting ? routingMode : (l0.isSubstrate ? (l0.isFill() ? Layout::MERGENET : substrateMode) : Layout::DEFAULT));
+					int rightMode = (l1.isRouting ? routingMode : (l1.isSubstrate ? (l1.isFill() ? Layout::MERGENET : substrateMode) : Layout::DEFAULT));
 					//printf("found e1 <-> e0: %d %d\n", leftMode, rightMode);
 
-					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE and (not l0.isFill() or not l1.isFill())) {
+					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
 						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET);
 						/*if (newConflict) {
 							printf("found conflict: %d\n", *offset);

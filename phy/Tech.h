@@ -95,7 +95,7 @@ struct Via : Material {
 	~Via();
 
 	// index into Tech::wires when >= 0
-	// index into Tech::subst when < 0
+	// index into Tech::models when < 0
 	// use flip() to access the index when negative.
 	int downLevel;
 	int upLevel;
