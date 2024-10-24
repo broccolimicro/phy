@@ -31,9 +31,21 @@ struct Rect {
 	Rect shift(vec2i pos, vec2i dir=vec2i(1,1)) const;
 	bool merge(Rect r);
 	bool overlaps(Rect r) const;
-	bool hasLabel() const;
+	bool contains(vec2i p) const;
 	Rect &bound(vec2i rll, vec2i rur);
 	Rect &bound(Rect r);
+
+	vec2i center() const;
+};
+
+struct Label {
+	Label();
+	Label(int net, vec2i pos, string txt);
+	~Label();
+
+	int net;
+	vec2i pos;
+	string txt;
 };
 
 // is this bound compared along the x or y boundary?
@@ -54,7 +66,7 @@ bool operator<(const Bound &b, int p);
 struct Layer {
 	Layer(const Tech &tech);
 	Layer(const Tech &tech, bool value);
-	Layer(const Tech &tech, int draw, int label = -1, int pin = -1);
+	Layer(const Tech &tech, int draw);
 	~Layer();
 
 	enum {
@@ -66,9 +78,9 @@ struct Layer {
 	// this is the source of truth
 	// index into layer stack defined in Tech
 	int draw;
-	int label;
-	int pin;
+
 	vector<Rect> geo;
+	vector<Label> lbl;
 
 	// flags to help pull apart spacing rules for cell construction
 	bool isRouting;
@@ -91,6 +103,9 @@ struct Layer {
 	void push(Rect rect, bool doSync=false);
 	void push(vector<Rect> rects, bool doSync=false);
 	void erase(int index, bool doSync=false);
+
+	void label(Label lbl);
+	void label(vector<Label> lbls);
 
 	Rect bbox() const;
 	void merge(bool doSync=false);
@@ -130,19 +145,18 @@ struct Evaluation {
 	void evaluate();
 };
 
-struct Port {
-	Port();
-	Port(string name, bool isInput=false, bool isOutput=false, bool isVdd=false, bool isGND=false, bool isSub=false);
-	~Port();
+struct Net {
+	Net();
+	Net(string name);
+	~Net();
 
-	int label;
-	vec2i pos;
+	vector<string> names;
 
-	string name;
-	bool isInput;
-	bool isOutput;
+	// These are only necessary for LEF export
 	bool isVdd;
 	bool isGND;
+	bool isInput;
+	bool isOutput;
 	bool isSub;
 };
 
@@ -168,22 +182,29 @@ struct Layout {
 	Rect box;
 
 	// The names for all of the nets
-	vector<Port> nets;
+	vector<Net> nets;
 
 	// The geometry for this cell
 	vector<Layer> layers;
 	
-	
-	vector<Layer>::const_iterator find(int draw, int layer=-1, int pin=-1) const;
-	vector<Layer>::iterator find(int draw, int layer=-1, int pin=-1);
-	vector<Layer>::iterator at(int draw, int layer=-1, int pin=-1);
+	vector<Layer>::const_iterator find(int draw) const;
+	vector<Layer>::iterator find(int draw);
+	vector<Layer>::iterator at(int draw);
 	void push(int layer, Rect rect, bool doSync=false);
 	void push(int layer, vector<Rect> rects, bool doSync=false);
 	void push(const Material &mat, Rect rect, bool doSync=false);
 	void push(const Material &mat, vector<Rect> rects, bool doSync=false);
 
+	void label(int layer, Label lbl);
+	void label(int layer, vector<Label> lbls);
+	void label(const Material &mat, Label lbl);
+	void label(const Material &mat, vector<Label> lbls);
+
 	Rect bbox() const;
 	void merge(bool doSync=false);
+
+	// trace the geometry to understand the structure of the nets
+	void trace();
 
 	void clear();
 };

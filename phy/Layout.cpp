@@ -78,6 +78,10 @@ bool Rect::overlaps(Rect r) const {
 	return ll[0] <= r.ur[0] and r.ll[0] <= ur[0] and ll[1] <= r.ur[1] and r.ll[1] <= ur[1];
 }
 
+bool Rect::contains(vec2i p) const {
+	return p[0] >= ll[0] and p[0] <= ur[0] and p[1] >= ll[1] and p[1] <= ur[1];
+}
+
 Rect &Rect::bound(vec2i rll, vec2i rur) {
 	if (ll[0] == ur[0] and ll[1] == ur[1]) {
 		ll = rll;
@@ -161,9 +165,23 @@ Rect &Rect::bound(Rect r) {
 	return *this;
 }
 
+vec2i Rect::center() const {
+	return (ll+ur)/2;
+}
 
-bool Rect::hasLabel() const {
-	return net >= 0;
+Label::Label() {
+	net = -1;
+	pos = vec2i(0,0);
+	txt = "";
+}
+
+Label::Label(int net, vec2i pos, string txt) {
+	this->net = net;
+	this->pos = pos;
+	this->txt = txt;
+}
+
+Label::~Label() {
 }
 
 Bound::Bound() {
@@ -190,8 +208,6 @@ bool operator<(const Bound &b, int p) {
 Layer::Layer(const Tech &tech) {
 	this->tech = &tech;
 	draw = Layer::UNKNOWN;
-	label = Layer::UNKNOWN;
-	pin = Layer::UNKNOWN;
 	dirty = false;
 	isRouting = false;
 	isSubstrate = false;
@@ -200,8 +216,6 @@ Layer::Layer(const Tech &tech) {
 Layer::Layer(const Tech &tech, bool value) {
 	this->tech = &tech;
 	draw = Layer::UNKNOWN;
-	label = Layer::UNKNOWN;
-	pin = Layer::UNKNOWN;
 	dirty = false;
 	isRouting = value;
 	isSubstrate = not value;
@@ -212,11 +226,9 @@ Layer::Layer(const Tech &tech, bool value) {
 	}
 }
 
-Layer::Layer(const Tech &tech, int draw, int label, int pin) {
+Layer::Layer(const Tech &tech, int draw) {
 	this->tech = &tech;
 	this->draw = draw;
-	this->label = label;
-	this->pin = pin;
 	this->dirty = false;
 
 	this->isRouting = tech.isRouting(draw);
@@ -319,6 +331,14 @@ void Layer::erase(int idx, bool doSync) {
 	}
 }
 
+void Layer::label(Label lbl) {
+	this->lbl.push_back(lbl);
+}
+
+void Layer::label(vector<Label> lbls) {
+	this->lbl.insert(this->lbl.end(), lbls.begin(), lbls.end());
+}
+
 Rect Layer::bbox() const {
 	if (geo.empty()) {
 		return Rect();
@@ -351,7 +371,7 @@ void Layer::merge(bool doSync) {
 }
 
 Layer Layer::clamp(int axis, int lo, int hi) const {
-	Layer result(*tech, draw, label, pin);
+	Layer result(*tech, draw);
 	result.isRouting = isRouting;
 	result.isSubstrate = isSubstrate;
 
@@ -460,8 +480,6 @@ Layer interact(const Layer &l0, const Layer &l1) {
 
 	Layer result(*l0.tech);
 	result.draw = l0.draw;
-	result.label = l0.label;
-	result.pin = l0.pin;
 	result.isRouting = l0.isRouting;
 	result.isSubstrate = l0.isSubstrate;
 	for (int i = 0; i < (int)l0.geo.size(); i++) {
@@ -481,8 +499,6 @@ Layer not_interact(const Layer &l0, const Layer &l1) {
 
 	Layer result(*l0.tech);
 	result.draw = l0.draw;
-	result.label = l0.label;
-	result.pin = l0.pin;
 	result.isRouting = l0.isRouting;
 	result.isSubstrate = l0.isSubstrate;
 	for (int i = 0; i < (int)l0.geo.size(); i++) {
@@ -636,33 +652,25 @@ void Evaluation::evaluate() {
 	}
 }
 
-Port::Port() {
-	label = -1;
-	name = "";
-	isInput = false;
-	isOutput = false;
+Net::Net() {
 	isVdd = false;
 	isGND = false;
+	isInput = false;
+	isOutput = false;
 	isSub = false;
 }
 
-Port::Port(string name, bool isInput, bool isOutput, bool isVdd, bool isGND, bool isSub) {
-	this->label = -1;
-	this->name = name;
-	this->isInput = isInput;
-	this->isOutput = isOutput;
-	this->isVdd = isVdd;
-	this->isGND = isGND;
-	this->isSub = isSub;
+Net::Net(string name) {
+	names.push_back(name);
+	isVdd = false;
+	isGND = false;
+	isInput = false;
+	isOutput = false;
+	isSub = false;
 }
 
-Port::~Port() {
+Net::~Net() {
 }
-
-/*Layout::Layout() {
-	tech = nullptr;
-	box = Rect();
-}*/
 
 Layout::Layout(const Tech &tech) {
 	this->tech = &tech;
@@ -672,7 +680,7 @@ Layout::Layout(const Tech &tech) {
 Layout::~Layout() {
 }
 
-vector<Layer>::const_iterator Layout::find(int draw, int label, int pin) const {
+vector<Layer>::const_iterator Layout::find(int draw) const {
 	auto layer = lower_bound(layers.begin(), layers.end(), draw);
 	if (layer == layers.end() or layer->draw != draw) {
 		return layers.end();
@@ -680,7 +688,7 @@ vector<Layer>::const_iterator Layout::find(int draw, int label, int pin) const {
 	return layer;
 }
 
-vector<Layer>::iterator Layout::find(int draw, int label, int pin) {
+vector<Layer>::iterator Layout::find(int draw) {
 	auto layer = lower_bound(layers.begin(), layers.end(), draw);
 	if (layer == layers.end() or layer->draw != draw) {
 		return layers.end();
@@ -688,21 +696,47 @@ vector<Layer>::iterator Layout::find(int draw, int label, int pin) {
 	return layer;
 }
 
-vector<Layer>::iterator Layout::at(int draw, int label, int pin) {
+vector<Layer>::iterator Layout::at(int draw) {
 	auto layer = lower_bound(layers.begin(), layers.end(), draw);
 	if (layer == layers.end() or layer->draw != draw) {
-		layer = layers.insert(layer, Layer(*tech, draw, label, pin));
+		layer = layers.insert(layer, Layer(*tech, draw));
 	}
 	if (layer->draw < 0) {
 		layer->draw = draw;
 	}
-	if (layer->label < 0) {
-		layer->label = label;
-	}
-	if (layer->pin < 0) {
-		layer->pin = pin;
-	}
 	return layer;
+}
+
+void Layout::push(int layer, Rect rect, bool doSync) {
+	at(layer)->push(rect, doSync);
+}
+
+void Layout::push(int layer, vector<Rect> rects, bool doSync) {
+	at(layer)->push(rects, doSync);
+}
+
+void Layout::push(const Material &mat, Rect rect, bool doSync) {
+	at(mat.draw)->push(rect, doSync);
+}
+
+void Layout::push(const Material &mat, vector<Rect> rects, bool doSync) {
+	at(mat.draw)->push(rects, doSync);
+}
+
+void Layout::label(int layer, Label lbl) {
+	at(layer)->label(lbl);
+}
+
+void Layout::label(int layer, vector<Label> lbls) {
+	at(layer)->label(lbls);
+}
+
+void Layout::label(const Material &mat, Label lbl) {
+	at(mat.label)->label(lbl);
+}
+
+void Layout::label(const Material &mat, vector<Label> lbls) {
+	at(mat.label)->label(lbls);
 }
 
 Rect Layout::bbox() const {
@@ -724,20 +758,17 @@ void Layout::merge(bool doSync) {
 	}
 }
 
-void Layout::push(int layer, Rect rect, bool doSync) {
-	at(layer)->push(rect, doSync);
-}
-
-void Layout::push(int layer, vector<Rect> rects, bool doSync) {
-	at(layer)->push(rects, doSync);
-}
-
-void Layout::push(const Material &mat, Rect rect, bool doSync) {
-	at(mat.draw, mat.label, mat.pin)->push(rect, doSync);
-}
-
-void Layout::push(const Material &mat, vector<Rect> rects, bool doSync) {
-	at(mat.draw, mat.label, mat.pin)->push(rects, doSync);
+void Layout::trace() {
+	/*for (auto layer = layout.layers.begin(); layer != layout.layers.end(); layer++) {
+		for (auto rect = layer->geo.begin(); rect != layer->geo.end(); rect++) {
+			vec2i cmp = rect->center();
+			if (rect->contains(origin)) {
+				rect->net = net;
+				found = true;
+				break;
+			}
+		}
+	}*/
 }
 
 void Layout::clear() {
