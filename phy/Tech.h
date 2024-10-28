@@ -62,7 +62,7 @@ struct Diffusion : Material {
 // This structure records how to draw a transistor
 struct Model {
 	Model();
-	Model(int type, string variant, string name, vector<int> stack);
+	Model(int type, string variant, string name, vector<int> stack, vector<int> excl=vector<int>());
 	~Model();
 
 	// Type of transistor (nmos or pmos)
@@ -80,6 +80,7 @@ struct Model {
 	// All of the diffusion layers starting top down
 	// index into Tech::subst
 	vector<int> stack;
+	vector<int> excl;
 };
 
 // This represents a routing layer for drawing wires to connect transistor

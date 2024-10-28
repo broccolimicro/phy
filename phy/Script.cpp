@@ -104,27 +104,43 @@ static PyObject* py_nmos(PyObject *self, PyObject *args) {
 	const char *variant = 0;
 	const char *name = 0;
 	
-	PyObject *pList;
+	PyObject *l0 = nullptr;
+	PyObject *l1 = nullptr;
 	PyObject *pItem;
 	Py_ssize_t n;
 
-	if(!PyArg_ParseTuple(args, "ssO!:nmos", &variant, &name, &PyList_Type, &pList)) {
+	if(!PyArg_ParseTuple(args, "ssO!|O!:nmos", &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1)) {
 		return NULL;
 	}
 
 	vector<int> stack;
-	n = PyList_Size(pList);
-	for (int i = 0; i < n; i++) {
-		pItem = PyList_GetItem(pList, i);
-		if(!PyLong_Check(pItem)) {
-				PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-				return NULL;
+	if (l0 != nullptr) {
+		n = PyList_Size(l0);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l0, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			stack.push_back(PyLong_AsLong(pItem));
 		}
-		stack.push_back(PyLong_AsLong(pItem));
+	}
+
+	vector<int> excl;
+	if (l1 != nullptr) {
+		n = PyList_Size(l1);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l1, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			excl.push_back(PyLong_AsLong(pItem));
+		}
 	}
 	
 	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::NMOS, variant, name, stack));
+	tech->models.push_back(Model(Model::NMOS, variant, name, stack, excl));
 	return PyLong_FromLong(result);
 }
 
@@ -133,27 +149,43 @@ static PyObject* py_pmos(PyObject *self, PyObject *args) {
 	const char *variant = 0;
 	const char *name = 0;
 	
-	PyObject *pList;
+	PyObject *l0 = nullptr;
+	PyObject *l1 = nullptr;
 	PyObject *pItem;
 	Py_ssize_t n;
 
-	if(!PyArg_ParseTuple(args, "ssO!:pmos", &variant, &name, &PyList_Type, &pList)) {
+	if(!PyArg_ParseTuple(args, "ssO!|O!:pmos", &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1)) {
 		return NULL;
 	}
 
 	vector<int> stack;
-	n = PyList_Size(pList);
-	for (int i = 0; i < n; i++) {
-		pItem = PyList_GetItem(pList, i);
-		if(!PyLong_Check(pItem)) {
-				PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-				return NULL;
+	if (l0 != nullptr) {
+		n = PyList_Size(l0);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l0, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			stack.push_back(PyLong_AsLong(pItem));
 		}
-		stack.push_back(PyLong_AsLong(pItem));
+	}
+
+	vector<int> excl;
+	if (l1 != nullptr) {
+		n = PyList_Size(l1);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l1, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			excl.push_back(PyLong_AsLong(pItem));
+		}
 	}
 
 	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::PMOS, variant, name, stack));
+	tech->models.push_back(Model(Model::PMOS, variant, name, stack, excl));
 	return PyLong_FromLong(result);
 }
 

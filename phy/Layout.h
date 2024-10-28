@@ -170,6 +170,9 @@ struct Net {
 	bool isInput;
 	bool isOutput;
 	bool isSub;
+
+	void set(string name);
+	bool has(string name) const;
 };
 
 struct Layout {

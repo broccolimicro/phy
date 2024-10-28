@@ -65,11 +65,12 @@ Model::Model() {
 	type = NMOS;
 }
 
-Model::Model(int type, string variant, string name, vector<int> stack) {
+Model::Model(int type, string variant, string name, vector<int> stack, vector<int> excl) {
 	this->variant = variant;
 	this->name = name;
 	this->type = type;
 	this->stack = stack;
+	this->excl = excl;
 }
 
 Model::~Model() {

@@ -777,6 +777,18 @@ Net::Net(string name) {
 Net::~Net() {
 }
 
+void Net::set(string name) {
+	auto pos = std::lower_bound(names.begin(), names.end(), name);
+	if (pos == names.end() or *pos != name) {
+		names.insert(pos, name);
+	}
+}
+
+bool Net::has(string name) const {
+	auto pos = std::lower_bound(names.begin(), names.end(), name);
+	return (pos != names.end() and *pos == name);
+}
+
 Layout::Layout(const Tech &tech) {
 	this->tech = &tech;
 	this->box = Rect();
@@ -832,7 +844,7 @@ void Layout::label(const Material &mat, vector<Label> lbls) {
 
 int Layout::netAt(string name) {
 	for (int i = 0; i < (int)nets.size(); i++) {
-		if (std::find(nets[i].names.begin(), nets[i].names.end(), name) != nets[i].names.end()) {
+		if (nets[i].has(name)) {
 			return i;
 		}
 	}
@@ -997,8 +1009,9 @@ void Layout::trace() {
 	printf("}\n");
 
 	printf("finding labels\n");*/
+	vector<int> mapping(traces.size(), -1);
+
 	nets.clear();
-	nets.resize(traces.size());
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
 		for (auto r = layer->second.geo.begin(); r != layer->second.geo.end(); r++) {
 			r->net = -1;
@@ -1030,8 +1043,11 @@ void Layout::trace() {
 				for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
 					for (auto r = pos->second.begin(); r != pos->second.end(); r++) {
 						if (gpos->second.geo[*r].contains(lbl->pos)) {
-							lbl->net = n;
-							nets[n].names.push_back(lbl->txt);
+							if (mapping[n] < 0) {
+								mapping[n] = netAt(lbl->txt);
+							}
+							lbl->net = mapping[n];
+							nets[mapping[n]].set(lbl->txt);
 							break;
 						}
 					}
@@ -1053,19 +1069,22 @@ void Layout::trace() {
 	//printf("saving net ids\n");
 	for (int n = 0; n < (int)traces.size(); n++) {
 		for (auto l = traces[n].begin(); l != traces[n].end(); l++) {
+			if (mapping[n] < 0) {
+				mapping[n] = netAt("_" + to_string((int)nets.size()));
+			}
 			auto layer = layers.find(l->first);
 			if (layer == layers.end()) {
 				continue;
 			}
 			if (layer->second.isPin) {
-				nets[n].isInput = true;
-				nets[n].isOutput = true;
+				nets[mapping[n]].isInput = true;
+				nets[mapping[n]].isOutput = true;
 			}
 			if (layer->second.isWell) {
-				nets[n].isSub = true;
+				nets[mapping[n]].isSub = true;
 			}
 			for (auto r = l->second.begin(); r != l->second.end(); r++) {
-				layer->second.geo[*r].net = n;
+				layer->second.geo[*r].net = mapping[n];
 			}
 		}
 	}
