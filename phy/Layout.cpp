@@ -1061,6 +1061,14 @@ void Layout::trace() {
 			for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
 				if (lbl->net < 0) {
 					lbl->net = netAt(lbl->txt);
+
+					if (layer->second.isPin or layer->second.isWell) {
+						nets[lbl->net].isInput = true;
+						nets[lbl->net].isOutput = true;
+					}
+					if (layer->second.isWell) {
+						nets[lbl->net].isSub = true;
+					}
 				}
 			}
 		}
@@ -1076,7 +1084,7 @@ void Layout::trace() {
 			if (layer == layers.end()) {
 				continue;
 			}
-			if (layer->second.isPin) {
+			if (layer->second.isPin or layer->second.isWell) {
 				nets[mapping[n]].isInput = true;
 				nets[mapping[n]].isOutput = true;
 			}
