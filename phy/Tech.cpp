@@ -44,6 +44,10 @@ Material::Material(int draw, int label, int pin) {
 Material::~Material() {
 }
 
+bool Material::contains(int layer) const {
+	return layer == draw or layer == label or layer == pin;
+}
+
 Diffusion::Diffusion() : Material() {
 	isWell = false;
 }
@@ -429,6 +433,34 @@ int Tech::findModel(string name) const {
 	return -1;
 }
 
+const Material *Tech::atMaterial(int level) const {
+	if (level < 0) {
+		return &subst[models[flip(level)].stack[0]];
+	}
+	return &wires[level];
+}
+
+const Material *Tech::findMaterial(int layer) const {
+	for (int j = 0; j < (int)subst.size(); j++) {
+		if (subst[j].contains(layer)) {
+			return &subst[j];
+		}
+	}
+
+	for (int j = 0; j < (int)wires.size(); j++) {
+		if (wires[j].contains(layer)) {
+			return &wires[j];
+		}
+	}
+
+	for (int j = 0; j < (int)vias.size(); j++) {
+		if (vias[j].contains(layer)) {
+			return &vias[j];
+		}
+	}
+	return nullptr;
+}
+
 vector<int> Tech::findVias(int downLevel, int upLevel) const {
 	int curr = downLevel;
 	
@@ -454,23 +486,8 @@ bool Tech::isRouting(int layer) const {
 		}
 	}
 
-	// There isn't any way to discern between routing licon
-	// and diffusion licon unless we record it separately as layer metadata in
-	// the layout. It's important not to count diffusion licon as routing to
-	// avoid unnecessary cycle breaks between transistor gate pins and contact
-	// pins in the transistor stacks. For now, we can discount all vias across
-	// the board, but this will need to be fixed down the road. Further, this
-	// whole distinction will need to be rethought when complex DRC rules are
-	// introduced.
-
-	/*for (auto via = vias.begin(); via != vias.end(); via++) {
-		if ((via->downLevel < 0 or via->upLevel < 0) and layer == via->draw) {
-			return false;
-		}
-	}*/
-
 	for (auto via = vias.begin(); via != vias.end(); via++) {
-		if (/*via->downLevel >= 0 and via->upLevel >= 0 and */layer == via->draw) {
+		if (layer == via->draw) {
 			return true;
 		}
 	}
@@ -485,22 +502,62 @@ bool Tech::isSubstrate(int layer) const {
 		}
 	}
 
-	// There isn't any way to discern between routing licon
-	// and diffusion licon unless we record it separately as layer metadata in
-	// the layout. It's important not to count diffusion licon as routing to
-	// avoid unnecessary cycle breaks between transistor gate pins and contact
-	// pins in the transistor stacks. For now, we can discount all vias across
-	// the board, but this will need to be fixed down the road. Further, this
-	// whole distinction will need to be rethought when complex DRC rules are
-	// introduced.
+	return false;
+}
 
-	//for (auto via = vias.begin(); via != vias.end(); via++) {
-	//	if ((via->downLevel < 0 or via->upLevel < 0) and layer == via->draw) {
-	//		return true;
-	//	}
-	//}
+bool Tech::isPin(int layer) const {
+	for (auto wire = wires.begin(); wire != wires.end(); wire++) {
+		if (layer == wire->pin) {
+			return true;
+		}
+	}
+
+	for (auto via = vias.begin(); via != vias.end(); via++) {
+		if (layer == via->pin) {
+			return true;
+		}
+	}
+
+	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
+		if (layer == mat->pin) {
+			return true;
+		}
+	}
 
 	return false;
 }
+
+bool Tech::isLabel(int layer) const {
+	for (auto wire = wires.begin(); wire != wires.end(); wire++) {
+		if (layer == wire->label) {
+			return true;
+		}
+	}
+
+	for (auto via = vias.begin(); via != vias.end(); via++) {
+		if (layer == via->label) {
+			return true;
+		}
+	}
+
+	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
+		if (layer == mat->label) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Tech::isWell(int layer) const {
+	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
+		if (mat->isWell and mat->contains(layer)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 
 }

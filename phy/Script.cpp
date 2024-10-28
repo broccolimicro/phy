@@ -123,12 +123,6 @@ static PyObject* py_nmos(PyObject *self, PyObject *args) {
 		stack.push_back(PyLong_AsLong(pItem));
 	}
 	
-	printf("loaded model %s %s {", variant, name);
-	for (int i = 0; i < (int)stack.size(); i++) {
-		printf("%d ", stack[i]);
-	}
-	printf("}\n");
-
 	int result = flip(tech->models.size());
 	tech->models.push_back(Model(Model::NMOS, variant, name, stack));
 	return PyLong_FromLong(result);
@@ -158,12 +152,6 @@ static PyObject* py_pmos(PyObject *self, PyObject *args) {
 		stack.push_back(PyLong_AsLong(pItem));
 	}
 
-	printf("loaded model %s %s {", variant, name);
-	for (int i = 0; i < (int)stack.size(); i++) {
-		printf("%d ", stack[i]);
-	}
-	printf("}\n");
-
 	int result = flip(tech->models.size());
 	tech->models.push_back(Model(Model::PMOS, variant, name, stack));
 	return PyLong_FromLong(result);
@@ -179,7 +167,6 @@ static PyObject* py_subst(PyObject *self, PyObject *args) {
 
 	int result = flip((int)tech->subst.size());
 	tech->subst.push_back(Diffusion(draw, label, pin, false));
-	printf("subst:%d (%d %d %d)\n", result, draw, label, pin);
 	return PyLong_FromLong(result);
 }
 
@@ -193,7 +180,6 @@ static PyObject* py_well(PyObject *self, PyObject *args) {
 
 	int result = flip((int)tech->subst.size());
 	tech->subst.push_back(Diffusion(draw, label, pin, true));
-	printf("well:%d (%d %d %d)\n", result, draw, label, pin);
 	return PyLong_FromLong(result);
 }
 
@@ -247,9 +233,6 @@ static PyObject* py_enclosing(PyObject *self, PyObject *args) {
 	}
 
 	int result = tech->setEnclosing(l0, l1, lo, hi);
-
-	printf("enclosing %d around %d: (%d,%d)\n", l0, l1, lo, hi);
-	tech->print(result);
 
 	return PyLong_FromLong(result);
 }
@@ -330,14 +313,14 @@ static PyObject* PyInit_floret()
 bool loadTech(Tech &dst, string path) {
 	tech = &dst;
 
-	if (not filesystem::exists(path)) {
+	vector<string> args = splitArguments(path);
+	if (not filesystem::exists(args[0])) {
 		return false;
 	}
 
 	PyConfig config;
 	PyConfig_InitPythonConfig(&config);
 
-	vector<string> args = splitArguments(path);
 	vector<char*> argv;
 	for (auto arg = args.begin(); arg != args.end(); arg++) {
 		argv.push_back(const_cast<char*>(arg->c_str()));

@@ -169,6 +169,23 @@ vec2i Rect::center() const {
 	return (ll+ur)/2;
 }
 
+int Rect::area() const {
+	return (ur[0] - ll[0])*(ur[1] - ll[1]);
+}
+
+Rect operator&(const Rect &r0, const Rect &r1) {
+	int net = -1;
+	if (r0.net < 0 and r1.net >= 0) {
+		net = r1.net;
+	} else if (r0.net >= 0 and r1.net < 0) {
+		net = r0.net;
+	} else if (r0.net == r1.net) {
+		net = r0.net;
+	}
+
+	return Rect(net, max(r0.ll, r1.ll), min(r0.ur, r1.ur));
+}
+
 Label::Label() {
 	net = -1;
 	pos = vec2i(0,0);
@@ -211,6 +228,8 @@ Layer::Layer(const Tech &tech) {
 	dirty = false;
 	isRouting = false;
 	isSubstrate = false;
+	isPin = false;
+	isWell = false;
 }
 
 Layer::Layer(const Tech &tech, bool value) {
@@ -219,6 +238,8 @@ Layer::Layer(const Tech &tech, bool value) {
 	dirty = false;
 	isRouting = value;
 	isSubstrate = not value;
+	isPin = false;
+	isWell = false;
 	if (value) {
 		int lo = std::numeric_limits<int>::min();
 		int hi = std::numeric_limits<int>::max();
@@ -233,6 +254,8 @@ Layer::Layer(const Tech &tech, int draw) {
 
 	this->isRouting = tech.isRouting(draw);
 	this->isSubstrate = tech.isSubstrate(draw);
+	this->isPin = tech.isPin(draw);
+	this->isWell = tech.isWell(draw);
 }
 
 Layer::~Layer() {
@@ -346,7 +369,7 @@ Rect Layer::bbox() const {
 	
 	bool conflict = false;
 	// DESIGN(edward.bingham) Naive approach first
-	Rect box(-1, geo[0].ll, geo[0].ur);
+	Rect box(geo[0].net, geo[0].ll, geo[0].ur);
 	for (int i = 1; i < (int)geo.size(); i++) {
 		if (box.net < 0 and not conflict) {
 			box.net = geo[i].net;
@@ -361,7 +384,7 @@ Rect Layer::bbox() const {
 
 void Layer::merge(bool doSync) {
 	// TODO use the bounds array to improve performance
-	for (int i = (int)geo.size()-1; i >= 0; i--) {
+	for (int i = (int)geo.size()-2; i >= 0; i--) {
 		for (int j = (int)geo.size()-1; j > i; j--) {
 			if (geo[i].merge(geo[j])) {
 				erase(j, doSync);
@@ -435,6 +458,91 @@ Layer &Layer::fillSpacing() {
 	return *this;
 }
 
+vector<vector<int> > Layer::trace() {
+	//printf("tracing %d\n", draw);
+	vector<vector<int> > clusters;
+	for (int r = 0; r < (int)geo.size(); r++) {
+		auto rect = geo.begin()+r;
+
+		// find clusters with overlapping geometry
+		vector<int> found;
+		for (int c = 0; c < (int)clusters.size(); c++) {
+			for (auto i = clusters[c].begin(); i != clusters[c].end(); i++) {
+				if (rect->overlaps(geo[*i])) {
+					found.push_back(c);
+					break;
+				}
+			}
+		}
+
+		if (not found.empty()) {
+			// If more than one cluster is found, then we combine those clusters
+			for (int i = (int)found.size()-1; i >= 1; i--) {
+				clusters[found[0]].insert(clusters[found[0]].end(), clusters[found[i]].begin(), clusters[found[i]].end());
+				clusters.erase(clusters.begin() + found[i]);
+			}
+			// Then add this rectangle to the remaining cluster
+			clusters[found[0]].push_back(r);
+		} else {
+			// No overlapping clusters were found, create a new cluster for this rectangle
+			clusters.push_back(vector<int>(1, r));
+		}
+	}
+	//printf("done tracing %d\n", draw);
+	return clusters;
+}
+
+vector<Layer> Layer::split(vector<vector<int> > clusters) {
+	if (clusters.empty()) {
+		clusters = trace();
+	}
+
+	vector<Layer> result;
+	result.reserve(clusters.size());
+	for (auto i = clusters.begin(); i != clusters.end(); i++) {
+		result.push_back(Layer(*tech, draw));
+		result.back().isRouting = isRouting;
+		result.back().isSubstrate = isSubstrate;
+		result.back().isPin = isPin;
+		result.back().isWell = isWell;
+		for (auto j = i->begin(); j != i->end(); j++) {
+			result.back().push(geo[*j]);
+		}
+	}
+	return result;
+}
+
+int Layer::area(vector<int> cluster) {
+	int result = 0;
+	for (auto i = geo.begin(); i != geo.end(); i++) {
+		result += i->area();
+		for (auto j = geo.begin(); j != i; j++) {
+			if (i->overlaps(*j)) {
+				result -= (*i & *j).area();
+			}
+		}
+	}
+	return result;
+}
+
+bool Layer::overlaps(const Rect &r0) const {
+	for (auto i = geo.begin(); i != geo.end(); i++) {
+		if (i->overlaps(r0)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Layer::overlaps(const Layer &l0) const {
+	for (auto i = geo.begin(); i != geo.end(); i++) {
+		if (l0.overlaps(*i)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool operator<(const Layer &l0, const Layer &l1) {
 	return l0.draw < l1.draw;
 }
@@ -454,19 +562,21 @@ Layer operator&(const Layer &l0, const Layer &l1) {
 	Layer result(*l0.tech);
 	result.isRouting = l0.isRouting and l1.isRouting;
 	result.isSubstrate = l0.isSubstrate or l1.isSubstrate;
-	for (int i = 0; i < (int)l0.geo.size(); i++) {
-		for (int j = 0; j < (int)l1.geo.size(); j++) {
-			if (l0.geo[i].overlaps(l1.geo[j])) {
+	result.isPin = l0.isPin or l1.isPin;
+	result.isWell = l0.isWell and l1.isWell;
+	for (auto r0 = l0.geo.begin(); r0 != l0.geo.end(); r0++) {
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r0->overlaps(*r1)) {
 				int net = -1;
-				if (l0.geo[i].net < 0 and l1.geo[j].net >= 0) {
-					net = l1.geo[j].net;
-				} else if (l0.geo[i].net >= 0 and l1.geo[j].net < 0) {
-					net = l0.geo[i].net;
-				} else if (l0.geo[i].net == l1.geo[j].net) {
-					net = l0.geo[i].net;
+				if (r0->net < 0 and r1->net >= 0 and not l1.isWell) {
+					net = r1->net;
+				} else if (r0->net >= 0 and not l0.isWell and r1->net < 0) {
+					net = r0->net;
+				} else if (r0->net == r1->net) {
+					net = r0->net;
 				}
 
-				result.push(Rect(net, max(l0.geo[i].ll, l1.geo[j].ll), min(l0.geo[i].ur, l1.geo[j].ur)));
+				result.push(Rect(net, max(r0->ll, r1->ll), min(r0->ur, r1->ur)));
 			}
 		}
 	}
@@ -588,21 +698,16 @@ void Evaluation::init() {
 
 bool Evaluation::has(int idx) {
 	if (idx >= 0) {
-		for (int i = 0; i < (int)layout->layers.size(); i++) {
-			if (layout->layers[i].draw == idx) {
-				return true;
-			}
-		}
+		return (layout->find(idx) != layout->layers.end());
 	}
 	return (layers.find(idx) != layers.end());
 }
 
 const Layer &Evaluation::at(int idx) const {
 	if (idx >= 0) {
-		for (int i = 0; i < (int)layout->layers.size(); i++) {
-			if (layout->layers[i].draw == idx) {
-				return layout->layers[i];
-			}
+		auto pos = layout->find(idx);
+		if (pos != layout->layers.end()) {
+			return pos->second;
 		}
 	}
 	auto pos = layers.find(idx);
@@ -680,63 +785,60 @@ Layout::Layout(const Tech &tech) {
 Layout::~Layout() {
 }
 
-vector<Layer>::const_iterator Layout::find(int draw) const {
-	auto layer = lower_bound(layers.begin(), layers.end(), draw);
-	if (layer == layers.end() or layer->draw != draw) {
-		return layers.end();
-	}
-	return layer;
+map<int, Layer>::const_iterator Layout::find(int draw) const {
+	return layers.find(draw);
 }
 
-vector<Layer>::iterator Layout::find(int draw) {
-	auto layer = lower_bound(layers.begin(), layers.end(), draw);
-	if (layer == layers.end() or layer->draw != draw) {
-		return layers.end();
-	}
-	return layer;
+map<int, Layer>::iterator Layout::find(int draw) {
+	return layers.find(draw);
 }
 
-vector<Layer>::iterator Layout::at(int draw) {
-	auto layer = lower_bound(layers.begin(), layers.end(), draw);
-	if (layer == layers.end() or layer->draw != draw) {
-		layer = layers.insert(layer, Layer(*tech, draw));
-	}
-	if (layer->draw < 0) {
-		layer->draw = draw;
-	}
-	return layer;
+map<int, Layer>::iterator Layout::at(int draw) {
+	auto result = layers.insert(pair<int, Layer>(draw, Layer(*tech, draw)));
+	return result.first;
 }
 
 void Layout::push(int layer, Rect rect, bool doSync) {
-	at(layer)->push(rect, doSync);
+	at(layer)->second.push(rect, doSync);
 }
 
 void Layout::push(int layer, vector<Rect> rects, bool doSync) {
-	at(layer)->push(rects, doSync);
+	at(layer)->second.push(rects, doSync);
 }
 
 void Layout::push(const Material &mat, Rect rect, bool doSync) {
-	at(mat.draw)->push(rect, doSync);
+	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(rect, doSync);
 }
 
 void Layout::push(const Material &mat, vector<Rect> rects, bool doSync) {
-	at(mat.draw)->push(rects, doSync);
+	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(rects, doSync);
 }
 
 void Layout::label(int layer, Label lbl) {
-	at(layer)->label(lbl);
+	at(layer)->second.label(lbl);
 }
 
 void Layout::label(int layer, vector<Label> lbls) {
-	at(layer)->label(lbls);
+	at(layer)->second.label(lbls);
 }
 
 void Layout::label(const Material &mat, Label lbl) {
-	at(mat.label)->label(lbl);
+	at(mat.label)->second.label(lbl);
 }
 
 void Layout::label(const Material &mat, vector<Label> lbls) {
-	at(mat.label)->label(lbls);
+	at(mat.label)->second.label(lbls);
+}
+
+int Layout::netAt(string name) {
+	for (int i = 0; i < (int)nets.size(); i++) {
+		if (std::find(nets[i].names.begin(), nets[i].names.end(), name) != nets[i].names.end()) {
+			return i;
+		}
+	}
+	int result = (int)nets.size();
+	nets.push_back(name);
+	return result;
 }
 
 Rect Layout::bbox() const {
@@ -744,31 +846,241 @@ Rect Layout::bbox() const {
 		return Rect();
 	}
 	
-	Rect box = layers[0].bbox();
-	for (int i = 1; i < (int)layers.size(); i++) {
-		Rect sub = layers[i].bbox();
-		box.bound(sub.ll, sub.ur);
+	Rect box = layers.begin()->second.bbox();
+	for (auto i = std::next(layers.begin()); i != layers.end(); i++) {
+		box.bound(i->second.bbox());
 	}
 	return box;
 }
 
 void Layout::merge(bool doSync) {
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
-		layer->merge(doSync);
+		layer->second.merge(doSync);
 	}
 }
 
 void Layout::trace() {
-	/*for (auto layer = layout.layers.begin(); layer != layout.layers.end(); layer++) {
-		for (auto rect = layer->geo.begin(); rect != layer->geo.end(); rect++) {
-			vec2i cmp = rect->center();
-			if (rect->contains(origin)) {
-				rect->net = net;
-				found = true;
-				break;
-			}
+	//printf("tracing cell %s\n", name.c_str());
+	// index into Layout::layers, index into Layer::geo
+	vector<map<int, vector<int> > > traces;
+
+	/*for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		printf("layer %s(%d)\n", tech->paint[layer->second.draw].name.c_str(), layer->second.draw);
+		for (auto rect = layer->second.geo.begin(); rect != layer->second.geo.end(); rect++) {
+			printf("rect %d (%d %d) (%d %d)\n", rect->net, rect->ll[0], rect->ll[1], rect->ur[0], rect->ur[1]);
+		}
+		for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
+			printf("label %d (%d %d) %s\n", lbl->net, lbl->pos[0], lbl->pos[1], lbl->txt.c_str());
 		}
 	}*/
+
+	// For a given layer
+	//printf("tracing layers\n");
+	vector<vector<int> > clusters;
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		if (not layer->second.isRouting and not layer->second.isPin and not layer->second.isWell) {
+			continue;
+		}
+
+		clusters = layer->second.trace();
+		for (auto c = clusters.begin(); c != clusters.end(); c++) {
+			traces.push_back(map<int, vector<int> >());
+			traces.back().insert(pair<int, vector<int> >(layer->first, *c));
+		}
+		clusters.clear();
+	}
+
+	/*printf("traces\n");
+	for (int i = 0; i < (int)traces.size(); i++) {
+		printf("%d {\n", i);
+		for (auto t = traces[i].begin(); t != traces[i].end(); t++) {
+			printf("\t%d -> {", t->first);
+			for (int j = 0; j < (int)t->second.size(); j++) {
+				printf("%d ", t->second[j]);
+			}
+			printf("}\n");
+		}
+		printf("}, ");
+	}
+	printf("}\n");
+
+	printf("looking for via connections\n");*/
+	for (auto via = tech->vias.begin(); via != tech->vias.end(); via++) {
+		const Material *up = tech->atMaterial(via->upLevel);
+		const Material *dn = tech->atMaterial(via->downLevel);
+		if (up == nullptr or dn == nullptr) {
+			printf("error: unable to find connecting layers for via\n");
+			continue;
+		}
+
+		vector<pair<int, int> > connect = {
+			{dn->draw, via->draw},
+			{dn->pin, via->draw},
+			{dn->draw, via->pin},
+			{dn->pin, via->pin},
+			{via->draw, up->draw},
+			{via->pin, up->draw},
+			{via->draw, up->pin},
+			{via->pin, up->pin},
+			{via->draw, dn->draw},
+			{via->draw, dn->pin},
+			{via->pin, dn->draw},
+			{via->pin, dn->pin},
+			{up->draw, via->draw},
+			{up->draw, via->pin},
+			{up->pin, via->draw},
+			{up->pin, via->pin},
+			{dn->draw, dn->pin},
+			{dn->pin, dn->draw},
+			{via->draw, via->pin},
+			{via->pin, via->draw},
+			{up->draw, up->pin},
+			{up->pin, up->draw},
+		};
+
+		for (int i = (int)traces.size()-2; i >= 0; i--) {
+			for (int j = (int)traces.size()-1; j > i; j--) {
+				for (auto k = connect.begin(); k != connect.end(); k++) {
+					auto lo = traces[i].find(k->first);
+					auto hi = traces[j].find(k->second);
+					auto glo = find(k->first);
+					auto ghi = find(k->second);
+					if (lo != traces[i].end() and hi != traces[j].end() and glo != layers.end() and ghi != layers.end()) {
+						// check to see if these layers intersect at all
+						bool found = false;
+						for (auto r0 = lo->second.begin(); r0 != lo->second.end() and not found; r0++) {
+							for (auto r1 = hi->second.begin(); r1 != hi->second.end() and not found; r1++) {
+								found = glo->second.geo[*r0].overlaps(ghi->second.geo[*r1]);
+							}
+						}
+
+						if (found) {
+							auto ii = traces[i].begin();
+							auto ji = traces[j].begin();
+							while (ii != traces[i].end() and ji != traces[j].end()) {
+								if (ii->first == ji->first) {
+									ii->second.insert(ii->second.end(), ji->second.begin(), ji->second.end());
+									ii++;
+									ji++;
+								} else if (ii->first < ji->first) {
+									ii++;
+								} else {
+									traces[i].insert(ii, *ji);
+									ii++;
+									ji++;
+								}
+							}
+							if (ji != traces[j].end()) {
+								traces[i].insert(ji, traces[j].end());
+							}
+							traces.erase(traces.begin()+j);
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/*printf("traces\n");
+	for (int i = 0; i < (int)traces.size(); i++) {
+		printf("%d {\n", i);
+		for (auto t = traces[i].begin(); t != traces[i].end(); t++) {
+			printf("\t%d -> {", t->first);
+			for (int j = 0; j < (int)t->second.size(); j++) {
+				printf("%d ", t->second[j]);
+			}
+			printf("}\n");
+		}
+		printf("}, ");
+	}
+	printf("}\n");
+
+	printf("finding labels\n");*/
+	nets.clear();
+	nets.resize(traces.size());
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		for (auto r = layer->second.geo.begin(); r != layer->second.geo.end(); r++) {
+			r->net = -1;
+		}
+		for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
+			lbl->net = -1;
+		}
+
+		if (layer->second.lbl.empty()) {
+			//printf("no labels %d\n", i);
+			continue;
+		}
+
+		const Material *mat = tech->findMaterial(layer->first);
+		if (mat == nullptr) {
+			printf("mat not found %s(%d)\n", tech->paint[layer->first].name.c_str(), layer->first);
+			continue;
+		}
+
+		for (int n = 0; n < (int)traces.size(); n++) {
+			for (int k = 0; k < 2; k++) {
+				auto pos = traces[n].find(k == 0 ? mat->draw : mat->pin);
+				auto gpos = layers.find(k == 0 ? mat->draw : mat->pin);
+				if (pos == traces[n].end() or gpos == layers.end()) {
+					//printf("mat not in trace %d\n", k == 0 ? mat->draw : mat->pin);
+					continue;
+				}
+
+				for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
+					for (auto r = pos->second.begin(); r != pos->second.end(); r++) {
+						if (gpos->second.geo[*r].contains(lbl->pos)) {
+							lbl->net = n;
+							nets[n].names.push_back(lbl->txt);
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		if (layer->second.isRouting or layer->second.isWell or layer->second.isPin or layer->second.isSubstrate) {
+			for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
+				if (lbl->net < 0) {
+					lbl->net = netAt(lbl->txt);
+				}
+			}
+		}
+	}
+
+	//printf("saving net ids\n");
+	for (int n = 0; n < (int)traces.size(); n++) {
+		for (auto l = traces[n].begin(); l != traces[n].end(); l++) {
+			auto layer = layers.find(l->first);
+			if (layer == layers.end()) {
+				continue;
+			}
+			if (layer->second.isPin) {
+				nets[n].isInput = true;
+				nets[n].isOutput = true;
+			}
+			if (layer->second.isWell) {
+				nets[n].isSub = true;
+			}
+			for (auto r = l->second.begin(); r != l->second.end(); r++) {
+				layer->second.geo[*r].net = n;
+			}
+		}
+	}
+
+	/*for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		printf("layer %s(%d)\n", tech->paint[layer->second.draw].name.c_str(), layer->second.draw);
+		for (auto rect = layer->second.geo.begin(); rect != layer->second.geo.end(); rect++) {
+			printf("rect %d (%d %d) (%d %d)\n", rect->net, rect->ll[0], rect->ll[1], rect->ur[0], rect->ur[1]);
+		}
+		for (auto lbl = layer->second.lbl.begin(); lbl != layer->second.lbl.end(); lbl++) {
+			printf("label %d (%d %d) %s\n", lbl->net, lbl->pos[0], lbl->pos[1], lbl->txt.c_str());
+		}
+	}
+
+	printf("done\n");*/
 }
 
 void Layout::clear() {

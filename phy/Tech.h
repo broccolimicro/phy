@@ -46,6 +46,8 @@ struct Material {
 	int draw;
 	int label;
 	int pin;
+
+	bool contains(int layer) const;
 };
 
 // This specifies a diffusion layer for drawing transistors
@@ -200,10 +202,15 @@ struct Tech {
 	int findPaint(string name) const;
 	int findPaint(int major, int minor) const;
 	int findModel(string name) const;
+	const Material *atMaterial(int level) const;
+	const Material *findMaterial(int layer) const;
 	vector<int> findVias(int downLevel, int upLevel) const;
 
 	bool isRouting(int layer) const;
 	bool isSubstrate(int layer) const;
+	bool isPin(int layer) const;
+	bool isLabel(int layer) const;
+	bool isWell(int layer) const;
 };
 
 }

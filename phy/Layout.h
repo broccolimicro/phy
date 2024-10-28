@@ -36,7 +36,10 @@ struct Rect {
 	Rect &bound(Rect r);
 
 	vec2i center() const;
+	int area() const;
 };
+
+Rect operator&(const Rect &r0, const Rect &r1);
 
 struct Label {
 	Label();
@@ -85,6 +88,8 @@ struct Layer {
 	// flags to help pull apart spacing rules for cell construction
 	bool isRouting;
 	bool isSubstrate;
+	bool isPin;
+	bool isWell;
 	
 	/////////////////////////////////////////////
 	// these optimize performance in the minOffset computation
@@ -114,6 +119,13 @@ struct Layer {
 	Layer &shift(vec2i pos, vec2i dir=vec2i(1,1));
 
 	Layer &fillSpacing();
+
+	vector<vector<int> > trace();
+	vector<Layer> split(vector<vector<int> > clusters=vector<vector<int> >());
+	int area(vector<int> cluster=vector<int>());
+
+	bool overlaps(const Rect &r0) const;
+	bool overlaps(const Layer &l0) const;
 };
 
 bool operator<(const Layer &l0, const Layer &l1);
@@ -185,11 +197,11 @@ struct Layout {
 	vector<Net> nets;
 
 	// The geometry for this cell
-	vector<Layer> layers;
+	map<int, Layer> layers;
 	
-	vector<Layer>::const_iterator find(int draw) const;
-	vector<Layer>::iterator find(int draw);
-	vector<Layer>::iterator at(int draw);
+	map<int, Layer>::const_iterator find(int draw) const;
+	map<int, Layer>::iterator find(int draw);
+	map<int, Layer>::iterator at(int draw);
 	void push(int layer, Rect rect, bool doSync=false);
 	void push(int layer, vector<Rect> rects, bool doSync=false);
 	void push(const Material &mat, Rect rect, bool doSync=false);
@@ -199,6 +211,8 @@ struct Layout {
 	void label(int layer, vector<Label> lbls);
 	void label(const Material &mat, Label lbl);
 	void label(const Material &mat, vector<Label> lbls);
+
+	int netAt(string name);
 
 	Rect bbox() const;
 	void merge(bool doSync=false);
