@@ -1027,7 +1027,7 @@ void Layout::trace() {
 
 		const Material *mat = tech->findMaterial(layer->first);
 		if (mat == nullptr) {
-			printf("mat not found %s(%d)\n", tech->paint[layer->first].name.c_str(), layer->first);
+			//printf("mat not found %s(%d)\n", tech->paint[layer->first].name.c_str(), layer->first);
 			continue;
 		}
 
