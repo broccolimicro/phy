@@ -100,16 +100,20 @@ static PyObject* py_fill(PyObject *self, PyObject *args) {
 	return PyLong_FromLong(layer);
 }
 
-static PyObject* py_nmos(PyObject *self, PyObject *args) {
+static PyObject* py_nmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 	const char *variant = 0;
 	const char *name = 0;
 	
 	PyObject *l0 = nullptr;
 	PyObject *l1 = nullptr;
+	PyObject *l2 = nullptr;
 	PyObject *pItem;
+	PyObject *pSub;
 	Py_ssize_t n;
 
-	if(!PyArg_ParseTuple(args, "ssO!|O!:nmos", &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1)) {
+	static const char *kwlist[] = {"variant", "name", "stack", "exclude", "bins", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!O!:nmos", const_cast<char **>(kwlist), &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1, &PyList_Type, &l2)) {
 		return NULL;
 	}
 
@@ -138,23 +142,60 @@ static PyObject* py_nmos(PyObject *self, PyObject *args) {
 			excl.push_back(PyLong_AsLong(pItem));
 		}
 	}
-	
+
+	vector<pair<int, int> > bins;
+	if (l2 != nullptr) {
+		n = PyList_Size(l2);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l2, i);
+			if(!PyTuple_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			if (PyTuple_Size(pItem) != 2) {
+				PyErr_SetString(PyExc_TypeError, "bins must have 2 elements (min and max)");
+				return NULL;
+			}
+
+			int lo = 0;
+			int hi = std::numeric_limits<int>::max();
+			pSub = PyTuple_GetItem(pItem, 0);
+			if(!PyLong_Check(pSub)) {
+					PyErr_SetString(PyExc_TypeError, "min value must be an integer.");
+					return NULL;
+			}
+			lo = PyLong_AsLong(pSub);
+
+			pSub = PyTuple_GetItem(pItem, 1);
+			if(!PyLong_Check(pSub)) {
+					PyErr_SetString(PyExc_TypeError, "max value must be an integer.");
+					return NULL;
+			}
+			hi = PyLong_AsLong(pSub);
+			
+			bins.push_back(pair<int, int>(lo, hi));
+		}
+	}
+
 	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::NMOS, variant, name, stack, excl));
+	tech->models.push_back(Model(Model::NMOS, variant, name, stack, excl, bins));
 	return PyLong_FromLong(result);
 }
 
-
-static PyObject* py_pmos(PyObject *self, PyObject *args) {
+static PyObject* py_pmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 	const char *variant = 0;
 	const char *name = 0;
 	
 	PyObject *l0 = nullptr;
 	PyObject *l1 = nullptr;
+	PyObject *l2 = nullptr;
 	PyObject *pItem;
+	PyObject *pSub;
 	Py_ssize_t n;
 
-	if(!PyArg_ParseTuple(args, "ssO!|O!:pmos", &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1)) {
+	static const char *kwlist[] = {"variant", "name", "stack", "exclude", "bins", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!O!:pmos", const_cast<char **>(kwlist), &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1, &PyList_Type, &l2)) {
 		return NULL;
 	}
 
@@ -184,8 +225,42 @@ static PyObject* py_pmos(PyObject *self, PyObject *args) {
 		}
 	}
 
+	vector<pair<int, int> > bins;
+	if (l2 != nullptr) {
+		n = PyList_Size(l2);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l2, i);
+			if(!PyTuple_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			if (PyTuple_Size(pItem) != 2) {
+				PyErr_SetString(PyExc_TypeError, "bins must have 2 elements (min and max)");
+				return NULL;
+			}
+
+			int lo = 0;
+			int hi = std::numeric_limits<int>::max();
+			pSub = PyTuple_GetItem(pItem, 0);
+			if(!PyLong_Check(pSub)) {
+					PyErr_SetString(PyExc_TypeError, "min value must be an integer.");
+					return NULL;
+			}
+			lo = PyLong_AsLong(pSub);
+
+			pSub = PyTuple_GetItem(pItem, 1);
+			if(!PyLong_Check(pSub)) {
+					PyErr_SetString(PyExc_TypeError, "max value must be an integer.");
+					return NULL;
+			}
+			hi = PyLong_AsLong(pSub);
+			
+			bins.push_back(pair<int, int>(lo, hi));
+		}
+	}
+
 	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::PMOS, variant, name, stack, excl));
+	tech->models.push_back(Model(Model::PMOS, variant, name, stack, excl, bins));
 	return PyLong_FromLong(result);
 }
 
@@ -317,8 +392,8 @@ static PyMethodDef EmbMethods[] = {
 	{"paint", py_paint, METH_VARARGS, "Create a paint layer."},
 	{"width", py_width, METH_VARARGS, "Set the minimum width for a paint layer."},
 	{"fill", py_fill, METH_VARARGS, "Indicate a fill layer."},
-	{"nmos", py_nmos, METH_VARARGS, "Create an nmos transistor model."},
-	{"pmos", py_pmos, METH_VARARGS, "Create a pmos transistor model."},
+	{"nmos", (PyCFunction)py_nmos, METH_VARARGS | METH_KEYWORDS, "Create an nmos transistor model."},
+	{"pmos", (PyCFunction)py_pmos, METH_VARARGS | METH_KEYWORDS, "Create a pmos transistor model."},
 	{"subst", py_subst, METH_VARARGS, "Define a diffusion layer."},
 	{"well", py_well, METH_VARARGS, "Define a well layer."},
 	{"via", py_via, METH_VARARGS, "Add a via model."},

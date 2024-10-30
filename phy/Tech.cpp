@@ -1,6 +1,7 @@
 #include "Tech.h"
 
 #include <limits>
+#include <algorithm>
 
 using namespace std;
 
@@ -65,12 +66,14 @@ Model::Model() {
 	type = NMOS;
 }
 
-Model::Model(int type, string variant, string name, vector<int> stack, vector<int> excl) {
+Model::Model(int type, string variant, string name, vector<int> stack, vector<int> excl, vector<pair<int, int> > bins) {
 	this->variant = variant;
 	this->name = name;
 	this->type = type;
 	this->stack = stack;
 	this->excl = excl;
+	this->bins = bins;
+	std::sort(this->bins.begin(), this->bins.end());
 }
 
 Model::~Model() {
