@@ -28,6 +28,7 @@ struct Rect {
 	vec2i operator[](int corner) const;
 	vec2i &operator[](int corner);
 
+	void normalize();
 	Rect shift(vec2i pos, vec2i dir=vec2i(1,1)) const;
 	bool merge(Rect r);
 	bool overlaps(Rect r) const;
@@ -113,7 +114,7 @@ struct Layer {
 	void label(vector<Label> lbls);
 
 	Rect bbox() const;
-	void merge(bool doSync=false);
+	Layer &merge(bool doSync=false);
 
 	Layer clamp(int axis, int lo, int hi) const;
 	Layer &shift(vec2i pos, vec2i dir=vec2i(1,1));

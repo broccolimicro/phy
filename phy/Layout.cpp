@@ -16,18 +16,7 @@ Rect::Rect(int net, vec2i ll, vec2i ur) {
 	this->net = net;
 	this->ll = ll;
 	this->ur = ur;
-
-	if (this->ur[1] < this->ll[1]) {
-		int tmp = this->ur[1];
-		this->ur[1] = this->ll[1];
-		this->ll[1] = tmp;
-	}
-
-	if (this->ur[0] < this->ll[0]) {
-		int tmp = this->ur[0];
-		this->ur[0] = this->ll[0];
-		this->ll[0] = tmp;
-	}
+	normalize();
 }
 
 Rect::~Rect() {
@@ -39,6 +28,20 @@ vec2i Rect::operator[](int corner) const {
 
 vec2i &Rect::operator[](int corner) {
 	return corner ? ur : ll;
+}
+
+void Rect::normalize() {
+	if (ur[1] < ll[1]) {
+		int tmp = ur[1];
+		ur[1] = ll[1];
+		ll[1] = tmp;
+	}
+
+	if (ur[0] < ll[0]) {
+		int tmp = ur[0];
+		ur[0] = ll[0];
+		ll[0] = tmp;
+	}
 }
 
 Rect Rect::shift(vec2i pos, vec2i dir) const {
@@ -382,15 +385,19 @@ Rect Layer::bbox() const {
 	return box;
 }
 
-void Layer::merge(bool doSync) {
+Layer &Layer::merge(bool doSync) {
 	// TODO use the bounds array to improve performance
+	// TODO(edward.bingham) This fails to fully merge all rectangles if you need
+	// three or more rectangles to form a fully covered rectangle.
 	for (int i = (int)geo.size()-2; i >= 0; i--) {
 		for (int j = (int)geo.size()-1; j > i; j--) {
 			if (geo[i].merge(geo[j])) {
 				erase(j, doSync);
+				j = geo.size();
 			}
 		}
 	}
+	return *this;
 }
 
 Layer Layer::clamp(int axis, int lo, int hi) const {
@@ -423,10 +430,11 @@ Layer &Layer::shift(vec2i pos, vec2i dir) {
 }
 
 Layer &Layer::fillSpacing() {
-	int minSpacing = tech->getSpacing(draw, draw);
+	bool fill = draw < 0 or tech->paint[draw].fill;
+	int minSpacing = draw < 0 ? 0 : tech->getSpacing(draw, draw);
 	for (int i = (int)geo.size()-1; i >= 0; i--) {
 		auto ri = geo.begin()+i;
-		if (ri->net < 0) {
+		if (not fill and ri->net < 0) {
 			continue;
 		}
 
@@ -950,6 +958,45 @@ void Layout::trace() {
 			{up->pin, up->draw},
 		};
 
+		/*vector<pair<int, int> > connect;
+		for (int i = 0; i < dn->size(); i++) {
+			for (int j = 0; j < via->size(); j++) {
+				connect.push_back({dn->at(i), via->at(j)});
+				connect.push_back({via->at(j), dn->at(i)});
+			}
+		}
+
+		for (int i = 0; i < via->size(); i++) {
+			for (int j = 0; j < up->size(); j++) {
+				connect.push_back({via->at(i), up->at(j)});
+				connect.push_back({up->at(j), via->at(i)});
+			}
+		}
+
+		for (int i = 0; i < dn->size(); i++) {
+			for (int j = 0; j < dn->size(); j++) {
+				if (i != j) {
+					connect.push_back({dn->at(i), dn->at(j)});
+				}
+			}
+		}
+
+		for (int i = 0; i < via->size(); i++) {
+			for (int j = 0; j < via->size(); j++) {
+				if (i != j) {
+					connect.push_back({via->at(i), via->at(j)});
+				}
+			}
+		}
+
+		for (int i = 0; i < up->size(); i++) {
+			for (int j = 0; j < up->size(); j++) {
+				if (i != j) {
+					connect.push_back({up->at(i), up->at(j)});
+				}
+			}
+		}*/
+
 		for (int i = (int)traces.size()-2; i >= 0; i--) {
 			for (int j = (int)traces.size()-1; j > i; j--) {
 				for (auto k = connect.begin(); k != connect.end(); k++) {
@@ -1027,14 +1074,14 @@ void Layout::trace() {
 
 		const Material *mat = tech->findMaterial(layer->first);
 		if (mat == nullptr) {
-			//printf("mat not found %s(%d)\n", tech->paint[layer->first].name.c_str(), layer->first);
+			//printf("mat not found %s(%d)\n", layer->first >= 0 ? tech->paint[layer->first].name.c_str() : "null", layer->first);
 			continue;
 		}
 
 		for (int n = 0; n < (int)traces.size(); n++) {
-			for (int k = 0; k < 2; k++) {
-				auto pos = traces[n].find(k == 0 ? mat->draw : mat->pin);
-				auto gpos = layers.find(k == 0 ? mat->draw : mat->pin);
+			for (int i = 0; i < mat->size(); i++) {
+				auto pos = traces[n].find(mat->at(i));
+				auto gpos = layers.find(mat->at(i));
 				if (pos == traces[n].end() or gpos == layers.end()) {
 					//printf("mat not in trace %d\n", k == 0 ? mat->draw : mat->pin);
 					continue;

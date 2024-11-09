@@ -49,6 +49,15 @@ bool Material::contains(int layer) const {
 	return layer == draw or layer == label or layer == pin;
 }
 
+int Material::size() const {
+	return 3;
+}
+
+int Material::at(int idx) const {
+	array<int, 3> arr({draw, pin, label});
+	return arr[idx];
+}
+
 Diffusion::Diffusion() : Material() {
 	isWell = false;
 }

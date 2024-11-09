@@ -48,6 +48,9 @@ struct Material {
 	int pin;
 
 	bool contains(int layer) const;
+
+	int size() const;
+	int at(int idx) const;
 };
 
 // This specifies a diffusion layer for drawing transistors
