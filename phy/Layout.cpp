@@ -1164,6 +1164,24 @@ void Layout::clear() {
 	nets.clear();
 }
 
+void Layout::print() {
+	int i = 0;
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		printf("layer[%d] %s(%d)\n", i, (layer->second.draw < 0 ? "" : tech->paint[layer->second.draw].name.c_str()), layer->second.draw);
+		int j = 0;
+		for (auto rect = layer->second.geo.begin(); rect != layer->second.geo.end(); rect++) {
+			printf("\trect[%d] %s(%d/%d) (%d %d) (%d %d)\n", j, ((rect->net < 0 or rect->net >= (int)nets.size() or nets[rect->net].names.empty()) ? "" : nets[rect->net].names[0].c_str()), rect->net, (int)nets.size(), rect->ll[0], rect->ll[1], rect->ur[0], rect->ur[1]);
+			j++;
+		}
+		j = 0;
+		for (auto label = layer->second.lbl.begin(); label != layer->second.lbl.end(); label++) {
+			printf("\tlabel[%d] %s(%d/%d) (%d %d) %s\n", j, ((label->net < 0 or label->net >= (int)nets.size() or nets[label->net].names.empty()) ? "" : nets[label->net].names[0].c_str()), label->net, (int)nets.size(), label->pos[0], label->pos[1], label->txt.c_str());
+			j++;
+		}
+		i++;
+	}
+}
+
 struct StackElem {
 	StackElem() {
 		net = -1;

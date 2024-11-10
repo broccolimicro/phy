@@ -225,6 +225,8 @@ struct Layout {
 	void trace();
 
 	void clear();
+
+	void print();
 };
 
 bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true);
