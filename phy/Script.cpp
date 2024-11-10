@@ -86,7 +86,7 @@ static PyObject* py_width(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
-	tech->paint[layer].minWidth = width;
+	tech->setWidth(layer, width);
 	return PyLong_FromLong(layer);
 }
 

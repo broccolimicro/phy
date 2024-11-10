@@ -15,7 +15,6 @@ Paint::Paint() {
 	this->name = "";
 	this->major = 0;
 	this->minor = 0;
-	this->minWidth = 0;
 	this->fill = false;
 }
 
@@ -23,7 +22,6 @@ Paint::Paint(string name, int major, int minor) {
 	this->name = name;
 	this->major = major;
 	this->minor = minor;
-	this->minWidth = 0;
 	this->fill = false;
 }
 
@@ -136,22 +134,38 @@ Tech::Tech() {
 Tech::~Tech() {
 }
 
-int Tech::getOr(int l0, int l1) const {
+int Tech::ruleIdx(int type, int l0) const {
+	if (l0 >= (int)paint.size()) {
+		return std::numeric_limits<int>::max();
+	}
+
+	for (int i = 0; i < (int)rules.size(); i++) {
+		if (rules[i].type == type and (int)rules[i].operands.size() == 1 and rules[i].operands[0] == l0) {
+			return flip(i);
+		}
+	}
+	return std::numeric_limits<int>::max();
+}
+
+int Tech::ruleIdx(int type, int l0, int l1) const {
 	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
 		return std::numeric_limits<int>::max();
 	}
 
 	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::OR and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
+		if (rules[i].type == type and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
 			return flip(i);
 		}
 	}
-
 	return std::numeric_limits<int>::max();
 }
 
+int Tech::getOr(int l0, int l1) const {
+	return ruleIdx(Rule::OR, l0, l1);
+}
+
 int Tech::setOr(int l0, int l1) {
-	int result = getOr(l0, l1);
+	int result = ruleIdx(Rule::OR, l0, l1);
 	if (result < 0) {
 		return result;
 	}
@@ -172,20 +186,11 @@ int Tech::setOr(int l0, int l1) {
 }
 
 int Tech::getAnd(int l0, int l1) const {
-	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
-	}
-
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::AND and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
-			return flip(i);
-		}
-	}
-	return std::numeric_limits<int>::max();
+	return ruleIdx(Rule::AND, l0, l1);
 }
 
 int Tech::setAnd(int l0, int l1) {
-	int result = getAnd(l0, l1);
+	int result = ruleIdx(Rule::AND, l0, l1);
 	if (result < 0) {
 		return result;
 	}
@@ -206,21 +211,11 @@ int Tech::setAnd(int l0, int l1) {
 }
 
 int Tech::getNot(int l) const {
-	if (l >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
-	}
-
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::NOT and (int)rules[i].operands.size() == 1 and rules[i].operands[0] == l) {
-			return flip(i);
-		}
-	}
-	return std::numeric_limits<int>::max();
+	return ruleIdx(Rule::NOT, l);
 }
 
-
 int Tech::setNot(int l) {
-	int result = getNot(l);
+	int result = ruleIdx(Rule::NOT, l);
 	if (result < 0) {
 		return result;
 	}
@@ -236,20 +231,11 @@ int Tech::setNot(int l) {
 }
 
 int Tech::getInteract(int l0, int l1) const {
-	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
-	}
-
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::INTERACT and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
-			return flip(i);
-		}
-	}
-	return std::numeric_limits<int>::max();
+	return ruleIdx(Rule::INTERACT, l0, l1);
 }
 
 int Tech::setInteract(int l0, int l1) {
-	int result = getInteract(l0, l1);
+	int result = ruleIdx(Rule::INTERACT, l0, l1);
 	if (result < 0) {
 		return result;
 	}
@@ -270,20 +256,11 @@ int Tech::setInteract(int l0, int l1) {
 }
 
 int Tech::getNotInteract(int l0, int l1) const {
-	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
-	}
-
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == Rule::NOT_INTERACT and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
-			return flip(i);
-		}
-	}
-	return std::numeric_limits<int>::max();
+	return ruleIdx(Rule::NOT_INTERACT, l0, l1);
 }
 
 int Tech::setNotInteract(int l0, int l1) {
-	int result = getNotInteract(l0, l1);
+	int result = ruleIdx(Rule::NOT_INTERACT, l0, l1);
 	if (result < 0) {
 		return result;
 	}
@@ -301,19 +278,6 @@ int Tech::setNotInteract(int l0, int l1) {
 		rules[flip(l1)].out.push_back(result);
 	}
 	return result;
-}
-
-int Tech::ruleIdx(int type, int l0, int l1) const {
-	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
-	}
-
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == type and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
-			return flip(i);
-		}
-	}
-	return std::numeric_limits<int>::max();
 }
 
 int Tech::getSpacing(int l0, int l1) const {
@@ -394,6 +358,35 @@ int Tech::setEnclosing(int l0, int l1, int lo, int hi) {
 	}
 	return result;
 }
+
+int Tech::getWidth(int l0) const {
+	int result = ruleIdx(Rule::WIDTH, l0);
+	if (result < 0) {
+		return rules[flip(result)].params[0];
+	}
+	return 0;
+}
+
+int Tech::setWidth(int l0, int value) {
+	int result = ruleIdx(Rule::WIDTH, l0);
+	if (result != std::numeric_limits<int>::max()) {
+		int idx = flip(result);
+		if (value < rules[idx].params[0]) {
+			rules[idx].params[0] = value;
+		}
+		return result;
+	}
+
+	result = flip((int)rules.size());
+	rules.push_back(Rule(Rule::WIDTH, {l0}, {value}));
+	if (l0 >= 0) {
+		paint[l0].out.push_back(result);
+	} else {
+		rules[flip(l0)].out.push_back(result);
+	}
+	return result;
+}
+
 
 
 string Tech::print(int layer) const {

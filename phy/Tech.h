@@ -25,9 +25,6 @@ struct Paint {
 	int major;
 	int minor;
 
-	// minimum width/height of layer
-	int minWidth;
-
 	// Can we fix min-spacing violations by filling in the space?
 	bool fill;
 
@@ -124,10 +121,11 @@ struct Rule {
 		INTERACT = 3,
 		NOT_INTERACT = 4,
 		SPACING = 5,
-		ENCLOSING = 6
+		ENCLOSING = 6,
+		WIDTH = 7,
 		// TODO implement remaining DRC checks
 		// EDGES, WITH/WITHOUT_AREA, WITH/WITHOUT_LENGTH,
-		// ENCLOSING, ONGRID, WIDTH, GROW, SHRINK
+		// ONGRID, GROW, SHRINK
 	};
 
 	// The type of DRC rule (See enum above)
@@ -186,6 +184,8 @@ struct Tech {
 	// information.
 	vector<Rule> rules;
 
+	int ruleIdx(int type, int l0) const;
+	int ruleIdx(int type, int l0, int l1) const;
 	int getOr(int l0, int l1) const;
 	int setOr(int l0, int l1);
 	int getAnd(int l0, int l1) const;
@@ -196,12 +196,12 @@ struct Tech {
 	int setInteract(int l0, int l1);
 	int getNotInteract(int l0, int l1) const;
 	int setNotInteract(int l0, int l1);
-
-	int ruleIdx(int type, int l0, int l1) const;
 	int getSpacing(int l0, int l1) const;
 	int setSpacing(int l0, int l1, int value);
 	vec2i getEnclosing(int l0, int l1) const;
 	int setEnclosing(int l0, int l1, int lo, int hi);
+	int getWidth(int l0) const;
+	int setWidth(int l0, int value);
 
 	string print(int layer) const;
 	int findPaint(string name) const;
