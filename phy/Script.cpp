@@ -449,22 +449,24 @@ static PyMethodDef EmbMethods[] = {
 };
 
 static PyModuleDef EmbModule = {
-	PyModuleDef_HEAD_INIT, "floret", NULL, -1, EmbMethods,
+	PyModuleDef_HEAD_INIT, "loom", NULL, -1, EmbMethods,
 	NULL, NULL, NULL, NULL
 };
 
-static PyObject* PyInit_floret()
+static PyObject* PyInit_loom()
 {
 	return PyModule_Create(&EmbModule);
 }
 
-bool loadTech(Tech &dst, string path) {
+bool loadTech(Tech &dst, string path, string cells) {
 	tech = &dst;
 
 	vector<string> args = splitArguments(path);
 	if (not filesystem::exists(args[0])) {
 		return false;
 	}
+	dst.path = args[0];
+	dst.lib = cells;
 
 	PyConfig config;
 	PyConfig_InitPythonConfig(&config);
@@ -484,7 +486,7 @@ bool loadTech(Tech &dst, string path) {
 		return false;
 	}
 
-	PyImport_AppendInittab("floret", &PyInit_floret);
+	PyImport_AppendInittab("loom", &PyInit_loom);
 	status = Py_InitializeFromConfig(&config);
 	if (PyStatus_Exception(status)) {
 		tech = nullptr;

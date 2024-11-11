@@ -507,6 +507,18 @@ vec<t, s> norm(vec<t, s> v)
 /* cross
  * (cross product)
  *
+ * Generates the two dimensional cross product of two vecs and returns
+ * the resultant value.
+ */
+template <class t1, class t2>
+t1 cross(vec<t1, 2> v1, vec<t2, 2> v2)
+{
+	return (v1.elems[0]*v2.elems[1] - v1.elems[1]*v2.elems[0]);
+}
+
+/* cross
+ * (cross product)
+ *
  * Generates the three dimensional cross product of two vecs and returns
  * the resultant vec. (x, y, z)
  */

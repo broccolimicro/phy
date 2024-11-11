@@ -189,6 +189,314 @@ Rect operator&(const Rect &r0, const Rect &r1) {
 	return Rect(net, max(r0.ll, r1.ll), min(r0.ur, r1.ur));
 }
 
+Poly::Poly() {
+	net = -1;
+}
+
+Poly::Poly(int net, vector<vec2i> v) {
+	this->net = net;
+	this->v = v;
+}
+
+Poly::Poly(Rect r) {
+	this->net = r.net;
+	this->v = {r.ll, vec2i(r.ur[0], r.ll[1]), r.ur, vec2i(r.ll[0], r.ur[1])};
+}
+
+Poly::~Poly() {
+}
+
+int Poly::xAt(vec2i from, vec2i to, int y) const {
+	return (to[0]-from[0])*(y-from[1])/(to[1]-from[1]);
+}
+
+int Poly::yAt(vec2i from, vec2i to, int x) const {
+	return (to[1]-from[1])*(x-from[0])/(to[0]-from[0]);
+}
+
+// == 0: collinear
+// > 0: clockwise
+// < 0: counter-clockwise
+int Poly::orientation(vec2i p, vec2i q, vec2i r) const {
+	return clamp(cross(q-p, r-q), -1, 1);
+}
+
+bool Poly::intersect(vec2i a0, vec2i a1, vec2i b0, vec2i b1) const {
+	int o1 = orientation(a0, a1, b0);
+	int o2 = orientation(a0, a1, b1);
+	int o3 = orientation(b0, b1, a0);
+	int o4 = orientation(b0, b1, a1);
+
+	if (o1 != o2 && o3 != o4) {
+		return true;
+	}
+
+	Rect ra(-1, a0, a1);
+	Rect rb(-1, b0, b1);
+	return ((o1 == 0 and ra.contains(b0))
+		or (o2 == 0 and ra.contains(b1))
+		or (o3 == 0 and rb.contains(a0))
+		or (o4 == 0 and rb.contains(a1)));
+}
+
+bool Poly::overlaps(Poly p) const {
+	// check if any edge intersects the rect
+	for (int i = 0; i < (int)v.size(); i++) {
+		int j = (i+1)%(int)v.size();
+		for (int k = 0; k < (int)p.v.size(); k++) {
+			int l = (k+1)%(int)p.v.size();
+			if (intersect(v[i], v[j], p.v[k], p.v[l])) {
+				return true;
+			}
+		}
+	}
+
+	// check if one polygon encloses the other
+	return (p.contains(v[0]) or contains(p.v[0]));
+}
+
+bool Poly::overlaps(Rect r) const {
+	// check if any edge intersects the rect
+	for (int i = 0; i < (int)v.size(); i++) {
+		int j = (i+1)%(int)v.size();
+		if (v[i][1] != v[j][1]) {
+			int bot = xAt(v[i], v[j], r.ll[1]);
+			int top = xAt(v[i], v[j], r.ur[1]);
+			if ((r.ll[0] <= bot and bot <= r.ur[0])
+				or (r.ll[0] <= top and top <= r.ur[0])) {
+				return true;
+			}
+		}
+
+		if (v[i][0] != v[j][0]) {
+			int left = yAt(v[i], v[j], r.ll[0]);
+			int right = yAt(v[i], v[j], r.ur[0]);
+
+			if ((r.ll[1] <= left and left <= r.ur[1])
+				or (r.ll[1] <= right and right <= r.ur[1])) {
+				return true;
+			}
+		}
+	}
+
+	// check if the rectangle is enclosed in the polygon
+	// check if the polygon is enclosed in the rectangle
+	return (r.contains(v[0]) or contains(r.ll));
+}
+
+bool Poly::contains(vec2i p) const {
+	// Use the winding algorithm number
+	int windings = 0;
+	for (int i = 0; i < (int)v.size(); i++) {
+		int j = (i+1)%(int)v.size();
+		if (v[i][1] < v[j][1]) {
+			windings += (p[1] >= v[i][1] and p[1] < v[j][1]
+			  and ((v[i][1] != v[j][1] and p[0] <= xAt(v[i], v[j], p[1]))
+					or (v[i][0] != v[j][0] and p[1] <= yAt(v[i], v[j], p[0]))));
+		} else if (v[j][1] < v[i][1]) {
+			windings += (p[1] > v[j][1] and p[1] <= v[i][1]
+				and ((v[i][1] != v[j][1] and p[0] <= xAt(v[j], v[i], p[1]))
+					or (v[i][0] != v[j][0] and p[1] <= yAt(v[j], v[i], p[0]))));
+		}
+	}
+	return (windings%2) == 1;
+}
+
+int Poly::area() const {
+	// Use the trapezoid integration formula
+	int total = 0;
+	for (int i = 0; i < (int)v.size(); i++) {
+		int j = (i+1)%(int)v.size();
+		total += (v[i][1]+v[j][1])*(v[i][0]-v[j][0]);
+	}
+	return abs(total)/2;
+}
+
+int Poly::perim() const {
+	int total = 0;
+	for (int i = 0; i < (int)v.size(); i++) {
+		total += dist(v[i], v[(i+1)%(int)v.size()]);
+	}
+	return total;
+}
+
+/*bool Poly::add(Rect r) {
+	// check if any edge intersects the rect
+	for (int i = 0; i < (int)v.size(); i++) {
+		int j = (i+1)%(int)v.size();
+		if (v[i][1] != v[j][1]) {
+			int bot = xAt(v[i], v[j], r.ll[1]);
+			int top = xAt(v[i], v[j], r.ur[1]);
+			if ((r.ll[0] <= bot and bot <= r.ur[0])
+				or (r.ll[0] <= top and top <= r.ur[0])) {
+				return true;
+			}
+		}
+
+		if (v[i][0] != v[j][0]) {
+			int left = yAt(v[i], v[j], r.ll[0]);
+			int right = yAt(v[i], v[j], r.ur[0]);
+
+			if ((r.ll[1] <= left and left <= r.ur[1])
+				or (r.ll[1] <= right and right <= r.ur[1])) {
+				return true;
+			}
+		}
+	}
+
+	// check if the rectangle is enclosed in the polygon
+	// check if the polygon is enclosed in the rectangle
+	return (r.contains(v[0]) or contains(r.ll));
+}
+
+bool Poly::add(Poly p) {
+}*/
+
+vector<Rect> Poly::split() {
+	vector<Rect> result;
+	bool done = false;
+	while (not done) {
+		done = true;
+		for (int i = 0; i < (int)v.size() and done; i++) {
+			int i0 = i;
+			int i1 = (i+1)%(int)v.size();
+			int i2 = (i+2)%(int)v.size();
+			int i3 = (i+3)%(int)v.size();
+			vec2i v0 = v[i0];
+			vec2i v1 = v[i1];
+			vec2i v2 = v[i2];
+			vec2i v3 = v[i3];
+
+			if ((v0[0] == v1[0] and v1[0] == v2[0]) or (v0[1] == v1[1] and v1[1] == v2[1])) {
+				v.erase(v.begin()+i1);
+				done = false;
+			} else if ((v1[0] == v2[0] and v2[0] == v3[0]) or (v1[1] == v2[1] and v2[1] == v3[1])) {
+				v.erase(v.begin()+i2);
+				done = false;
+			} else if (v0[1] == v1[1] and v1[0] == v2[0] and v3[1] == v2[1]) {
+				// Handle horizontal dog-ear rectangles...
+				if (v2[1] > v1[1] and v0[0] < v1[0] and v3[0] < v2[0]) {
+					// ...on the right hand side
+					Rect r(net, vec2i(max(v0[0], v3[0]), v1[1]), v2);
+					// check if this rectangular section of the polygon is convex
+					bool found = false;
+					for (int j = 0; j < (int)v.size() and not found; j++) {
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+					}
+					if (not found) {
+						result.push_back(r);
+						if (v0[0] < v3[0]) {
+							v[i1][0] = v3[0];
+							v.erase(v.begin()+i2);
+						} else if (v3[0] < v0[0]) {
+							v[i2][0] = v0[0];
+							v.erase(v.begin()+i1);
+						} else if (i1 < i2) {
+							v.erase(v.begin()+i2);
+							v.erase(v.begin()+i1);
+						} else if (i2 < i1) {
+							v.erase(v.begin()+i1);
+							v.erase(v.begin()+i2);
+						} else {
+							v.erase(v.begin()+i1);
+						}
+						done = false;
+					}
+				} else if (v1[1] > v2[1] and v0[0] > v1[0] and v3[0] > v2[0]) {
+					// ...on the left hand side
+					Rect r(net, v1, vec2i(min(v0[0], v3[0]), v2[1]));
+					// check if this rectangular section of the polygon is convex
+					bool found = false;
+					for (int j = 0; j < (int)v.size() and not found; j++) {
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+					}
+					if (not found) {
+						result.push_back(r);
+						if (v0[0] > v3[0]) {
+							v[i1][0] = v3[0];
+							v.erase(v.begin()+i2);
+						} else if (v3[0] > v0[0]) {
+							v[i2][0] = v0[0];
+							v.erase(v.begin()+i1);
+						} else if (i1 < i2) {
+							v.erase(v.begin()+i2);
+							v.erase(v.begin()+i1);
+						} else if (i2 < i1) {
+							v.erase(v.begin()+i1);
+							v.erase(v.begin()+i2);
+						} else {
+							v.erase(v.begin()+i1);
+						}
+						done = false;
+					}
+				}
+			} else if (v0[0] == v1[0] and v1[1] == v2[1] and v3[0] == v2[0]) {
+				// Handle vertical dog-ear rectangles...
+				if (v1[0] > v2[0] and v0[1] < v1[1] and v3[1] < v2[1]) {
+					// ...on the top side
+					Rect r(net, vec2i(v1[0], max(v0[1], v3[1])), v2);
+					// check if this rectangular section of the polygon is convex
+					bool found = false;
+					for (int j = 0; j < (int)v.size() and not found; j++) {
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+					}
+					if (not found) {
+						result.push_back(r);
+						if (v0[1] < v3[1]) {
+							v[i1][1] = v3[1];
+							v.erase(v.begin()+i2);
+						} else if (v3[1] < v0[1]) {
+							v[i2][1] = v0[1];
+							v.erase(v.begin()+i1);
+						} else if (i1 < i2) {
+							v.erase(v.begin()+i2);
+							v.erase(v.begin()+i1);
+						} else if (i2 < i1) {
+							v.erase(v.begin()+i1);
+							v.erase(v.begin()+i2);
+						} else {
+							v.erase(v.begin()+i1);
+						}
+						done = false;
+					}
+				} else if (v2[0] > v1[0] and v0[1] > v1[1] and v3[1] > v2[1]) {
+					// ...on the bottom side
+					Rect r(net, v1, vec2i(v2[0], min(v0[1], v3[1])));
+					// check if this rectangular section of the polygon is convex
+					bool found = false;
+					for (int j = 0; j < (int)v.size() and not found; j++) {
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+					}
+					if (not found) {
+						result.push_back(r);
+						if (v0[1] > v3[1]) {
+							v[i1][1] = v3[1];
+							v.erase(v.begin()+i2);
+						} else if (v3[1] > v0[1]) {
+							v[i2][1] = v0[1];
+							v.erase(v.begin()+i1);
+						} else if (i1 < i2) {
+							v.erase(v.begin()+i2);
+							v.erase(v.begin()+i1);
+						} else if (i2 < i1) {
+							v.erase(v.begin()+i1);
+							v.erase(v.begin()+i2);
+						} else {
+							v.erase(v.begin()+i1);
+						}
+						done = false;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+bool Poly::empty() {
+	return ((int)v.size() <= 2 or area() == 0);
+}
+
 Label::Label() {
 	net = -1;
 	pos = vec2i(0,0);
@@ -337,6 +645,14 @@ void Layer::push(vector<Rect> rects, bool doSync) {
 	}
 }
 
+void Layer::push(Poly gon, bool doSync) {
+	poly.push_back(gon);
+}
+
+void Layer::push(vector<Poly> gons, bool doSync) {
+	poly.insert(poly.end(), gons.begin(), gons.end());
+}
+
 void Layer::erase(int idx, bool doSync) {
 	geo.erase(geo.begin()+idx);
 	dirty = dirty or not doSync;
@@ -383,6 +699,16 @@ Rect Layer::bbox() const {
 		box.bound(geo[i].ll, geo[i].ur);
 	}
 	return box;
+}
+
+void Layer::normalize() {
+	for (int i = (int)poly.size()-1; i >= 0; i--) {
+		vector<Rect> r = poly[i].split();
+		push(r);
+		if (poly[i].empty()) {
+			poly.erase(poly.begin()+i);
+		}
+	}
 }
 
 Layer &Layer::merge(bool doSync) {
@@ -834,6 +1160,22 @@ void Layout::push(const Material &mat, vector<Rect> rects, bool doSync) {
 	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(rects, doSync);
 }
 
+void Layout::push(int layer, Poly gon, bool doSync) {
+	at(layer)->second.push(gon, doSync);
+}
+
+void Layout::push(int layer, vector<Poly> gons, bool doSync) {
+	at(layer)->second.push(gons, doSync);
+}
+
+void Layout::push(const Material &mat, Poly gon, bool doSync) {
+	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(gon, doSync);
+}
+
+void Layout::push(const Material &mat, vector<Poly> gons, bool doSync) {
+	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(gons, doSync);
+}
+
 void Layout::label(int layer, Label lbl) {
 	at(layer)->second.label(lbl);
 }
@@ -871,6 +1213,12 @@ Rect Layout::bbox() const {
 		box.bound(i->second.bbox());
 	}
 	return box;
+}
+
+void Layout::normalize() {
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		layer->second.normalize();
+	}
 }
 
 void Layout::merge(bool doSync) {

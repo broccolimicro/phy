@@ -4,6 +4,6 @@
 
 namespace phy {
 
-bool loadTech(Tech &dst, string path);
+bool loadTech(Tech &dst, string path, string cells="");
 
 }

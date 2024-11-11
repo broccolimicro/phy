@@ -152,6 +152,9 @@ struct Tech {
 	Tech();
 	~Tech();
 
+	string path;
+	string lib;
+
 	// Scale of integer units in micrometers for each rectangle
 	// in the Layout.
 	double dbunit;

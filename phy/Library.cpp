@@ -4,8 +4,7 @@ using namespace std;
 
 namespace phy {
 
-Library::Library(const Tech &tech, string libPath) {
-	this->libPath = libPath;
+Library::Library(const Tech &tech) {
 	this->tech = &tech;
 }
 

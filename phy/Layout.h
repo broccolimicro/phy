@@ -11,6 +11,8 @@ using namespace std;
 namespace phy {
 
 struct Layout;
+struct Rect;
+struct Poly;
 
 struct Rect {
 	Rect();
@@ -41,6 +43,38 @@ struct Rect {
 };
 
 Rect operator&(const Rect &r0, const Rect &r1);
+
+struct Poly {
+	Poly();
+	Poly(int net, vector<vec2i> v);
+	Poly(Rect r);
+	~Poly();
+	
+	int net;
+	vector<vec2i> v;
+
+	int xAt(vec2i from, vec2i to, int y) const;
+	int yAt(vec2i from, vec2i to, int x) const;
+	int orientation(vec2i p, vec2i q, vec2i r) const;
+	bool intersect(vec2i a0, vec2i a1, vec2i b0, vec2i b1) const;
+
+	bool overlaps(Poly p) const;
+	bool overlaps(Rect r) const;
+	bool contains(vec2i p) const;
+
+	int area() const;
+	int perim() const;
+
+	//bool b_or(Rect r);
+	//bool b_or(Poly p);
+	//bool b_diff(Rect r);
+	//bool b_diff(Poly p);
+	//bool b_and(Rect r);
+	//bool b_and(Poly p);
+	
+	vector<Rect> split();
+	bool empty(); 
+};
 
 struct Label {
 	Label();
@@ -84,6 +118,7 @@ struct Layer {
 	int draw;
 
 	vector<Rect> geo;
+	vector<Poly> poly;
 	vector<Label> lbl;
 
 	// flags to help pull apart spacing rules for cell construction
@@ -108,12 +143,16 @@ struct Layer {
 
 	void push(Rect rect, bool doSync=false);
 	void push(vector<Rect> rects, bool doSync=false);
+	void push(Poly gon, bool doSync=false);
+	void push(vector<Poly> gons, bool doSync=false);
+
 	void erase(int index, bool doSync=false);
 
 	void label(Label lbl);
 	void label(vector<Label> lbls);
 
 	Rect bbox() const;
+	void normalize();
 	Layer &merge(bool doSync=false);
 
 	Layer clamp(int axis, int lo, int hi) const;
@@ -211,6 +250,11 @@ struct Layout {
 	void push(const Material &mat, Rect rect, bool doSync=false);
 	void push(const Material &mat, vector<Rect> rects, bool doSync=false);
 
+	void push(int layer, Poly gon, bool doSync=false);
+	void push(int layer, vector<Poly> gons, bool doSync=false);
+	void push(const Material &mat, Poly gon, bool doSync=false);
+	void push(const Material &mat, vector<Poly> gons, bool doSync=false);
+
 	void label(int layer, Label lbl);
 	void label(int layer, vector<Label> lbls);
 	void label(const Material &mat, Label lbl);
@@ -219,6 +263,7 @@ struct Layout {
 	int netAt(string name);
 
 	Rect bbox() const;
+	void normalize();
 	void merge(bool doSync=false);
 
 	// trace the geometry to understand the structure of the nets
