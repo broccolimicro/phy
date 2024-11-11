@@ -184,12 +184,12 @@ struct Tech {
 	// information.
 	vector<Rule> rules;
 
-	int ruleIdx(int type, int l0) const;
-	int ruleIdx(int type, int l0, int l1) const;
-	int getOr(int l0, int l1) const;
-	int setOr(int l0, int l1);
-	int getAnd(int l0, int l1) const;
-	int setAnd(int l0, int l1);
+	int findRule(int type, vector<int> operands) const;
+	int setRule(int type, vector<int> operands);
+	int getOr(vector<int> layers) const;
+	int setOr(vector<int> layers);
+	int getAnd(vector<int> layers) const;
+	int setAnd(vector<int> layers);
 	int getNot(int l) const;
 	int setNot(int l);
 	int getInteract(int l0, int l1) const;

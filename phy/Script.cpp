@@ -126,7 +126,12 @@ static PyObject* py_nmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
 					return NULL;
 			}
-			stack.push_back(PyLong_AsLong(pItem));
+			int layer = PyLong_AsLong(pItem);
+			if (layer >= 0) {
+				PyErr_SetString(PyExc_TypeError, "stack layers must be materials.");
+				return NULL;
+			}
+			stack.push_back(layer);
 		}
 	}
 
@@ -208,7 +213,12 @@ static PyObject* py_pmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
 					return NULL;
 			}
-			stack.push_back(PyLong_AsLong(pItem));
+			int layer = PyLong_AsLong(pItem);
+			if (layer >= 0) {
+				PyErr_SetString(PyExc_TypeError, "stack layers must be materials.");
+				return NULL;
+			}
+			stack.push_back(layer);
 		}
 	}
 
@@ -339,30 +349,61 @@ static PyObject* py_enclosing(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
+	if (l0 < 0) {
+		PyErr_SetString(PyExc_TypeError, "enclosing layer must be a paint layer.");
+		return NULL;
+	}
+
 	int result = tech->setEnclosing(l0, l1, lo, hi);
 
 	return PyLong_FromLong(result);
 }
 
 static PyObject* py_b_and(PyObject *self, PyObject *args) {
-	int l0 = -1;
-	int l1 = -1;
-	if(!PyArg_ParseTuple(args, "ii:b_and", &l0, &l1)) {
+	vector<int> l;
+	Py_ssize_t n;
+	PyObject *pItem;
+	if (args != nullptr) {
+		n = PyTuple_Size(args);
+		for (int i = 0; i < n; i++) {
+			pItem = PyTuple_GetItem(args, i);
+			if (not PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			l.push_back(PyLong_AsLong(pItem));
+		}
+	}
+	if ((int)l.size() < 2) {
+		PyErr_SetString(PyExc_TypeError, "b_and requires at least two layers.");
 		return NULL;
 	}
 
-	int result = tech->setAnd(l0, l1);
+	int result = tech->setAnd(l);
 	return PyLong_FromLong(result);
 }
 
 static PyObject* py_b_or(PyObject *self, PyObject *args) {
-	int l0 = -1;
-	int l1 = -1;
-	if(!PyArg_ParseTuple(args, "ii:b_or", &l0, &l1)) {
+	vector<int> l;
+	Py_ssize_t n;
+	PyObject *pItem;
+	if (args != nullptr) {
+		n = PyTuple_Size(args);
+		for (int i = 0; i < n; i++) {
+			pItem = PyTuple_GetItem(args, i);
+			if (not PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			l.push_back(PyLong_AsLong(pItem));
+		}
+	}
+	if ((int)l.size() < 2) {
+		PyErr_SetString(PyExc_TypeError, "b_or requires at least two layers.");
 		return NULL;
 	}
 
-	int result = tech->setOr(l0, l1);
+	int result = tech->setOr(l);
 	return PyLong_FromLong(result);
 }
 

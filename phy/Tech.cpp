@@ -134,154 +134,85 @@ Tech::Tech() {
 Tech::~Tech() {
 }
 
-int Tech::ruleIdx(int type, int l0) const {
-	if (l0 >= (int)paint.size()) {
+int Tech::findRule(int type, vector<int> operands) const {
+	if (operands.empty()) {
 		return std::numeric_limits<int>::max();
 	}
 
 	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == type and (int)rules[i].operands.size() == 1 and rules[i].operands[0] == l0) {
-			return flip(i);
+		if (rules[i].type == type and rules[i].operands.size() == operands.size()) {
+			bool found = true;
+			for (int j = 0; j < (int)operands.size() and found; j++) {
+				found = (rules[i].operands[j] == operands[j]);
+			}
+			if (found) {
+				return flip(i);
+			}
 		}
 	}
 	return std::numeric_limits<int>::max();
 }
 
-int Tech::ruleIdx(int type, int l0, int l1) const {
-	if (l0 >= (int)paint.size() or l1 >= (int)paint.size()) {
-		return std::numeric_limits<int>::max();
+int Tech::setRule(int type, vector<int> operands) {
+	int result = findRule(type, operands);
+	if (result < 0) {
+		return result;
 	}
 
-	for (int i = 0; i < (int)rules.size(); i++) {
-		if (rules[i].type == type and (int)rules[i].operands.size() == 2 and rules[i].operands[0] == l0 and rules[i].operands[1] == l1) {
-			return flip(i);
+	result = flip((int)rules.size());
+	rules.push_back(Rule(type, operands));
+	for (auto l = operands.begin(); l != operands.end(); l++) {
+		if (*l >= 0) {
+			paint[*l].out.push_back(result);
+		} else {
+			rules[flip(*l)].out.push_back(result);
 		}
 	}
-	return std::numeric_limits<int>::max();
-}
-
-int Tech::getOr(int l0, int l1) const {
-	return ruleIdx(Rule::OR, l0, l1);
-}
-
-int Tech::setOr(int l0, int l1) {
-	int result = ruleIdx(Rule::OR, l0, l1);
-	if (result < 0) {
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::OR, {l0, l1}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
-	}
 	return result;
 }
 
-int Tech::getAnd(int l0, int l1) const {
-	return ruleIdx(Rule::AND, l0, l1);
+int Tech::getOr(vector<int> layers) const {
+	return findRule(Rule::OR, layers);
 }
 
-int Tech::setAnd(int l0, int l1) {
-	int result = ruleIdx(Rule::AND, l0, l1);
-	if (result < 0) {
-		return result;
-	}
+int Tech::setOr(vector<int> layers) {
+	return setRule(Rule::OR, layers);
+}
 
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::AND, {l0, l1}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
-	}
-	return result;
+int Tech::getAnd(vector<int> layers) const {
+	return findRule(Rule::AND, layers);
+}
+
+int Tech::setAnd(vector<int> layers) {
+	return setRule(Rule::AND, layers);
 }
 
 int Tech::getNot(int l) const {
-	return ruleIdx(Rule::NOT, l);
+	return findRule(Rule::NOT, {l});
 }
 
 int Tech::setNot(int l) {
-	int result = ruleIdx(Rule::NOT, l);
-	if (result < 0) {
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::NOT, {l}));
-	if (l >= 0) {
-		paint[l].out.push_back(result);
-	} else {
-		rules[flip(l)].out.push_back(result);
-	}
-	return result;
+	return setRule(Rule::NOT, {l});
 }
 
 int Tech::getInteract(int l0, int l1) const {
-	return ruleIdx(Rule::INTERACT, l0, l1);
+	return findRule(Rule::INTERACT, {l0, l1});
 }
 
 int Tech::setInteract(int l0, int l1) {
-	int result = ruleIdx(Rule::INTERACT, l0, l1);
-	if (result < 0) {
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::INTERACT, {l0, l1}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
-	}
-	return result;
+	return setRule(Rule::INTERACT, {l0, l1});
 }
 
 int Tech::getNotInteract(int l0, int l1) const {
-	return ruleIdx(Rule::NOT_INTERACT, l0, l1);
+	return findRule(Rule::NOT_INTERACT, {l0, l1});
 }
 
 int Tech::setNotInteract(int l0, int l1) {
-	int result = ruleIdx(Rule::NOT_INTERACT, l0, l1);
-	if (result < 0) {
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::NOT_INTERACT, {l0, l1}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
-	}
-	return result;
+	return setRule(Rule::NOT_INTERACT, {l0, l1});
 }
 
 int Tech::getSpacing(int l0, int l1) const {
-	int result = ruleIdx(Rule::SPACING, l0, l1);
+	int result = findRule(Rule::SPACING, {l0, l1});
 	if (result < 0) {
 		return rules[flip(result)].params[0];
 	}
@@ -289,32 +220,21 @@ int Tech::getSpacing(int l0, int l1) const {
 }
 
 int Tech::setSpacing(int l0, int l1, int value) {
-	int result = ruleIdx(Rule::SPACING, l0, l1);
+	int result = setRule(Rule::SPACING, {l0, l1});
 	if (result != std::numeric_limits<int>::max()) {
 		int idx = flip(result);
-		if (value < rules[idx].params[0]) {
+		if ((int)rules[idx].params.size() < 1) {
+			rules[idx].params.resize(1, 0);
+		}
+		if (value > rules[idx].params[0]) {
 			rules[idx].params[0] = value;
 		}
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::SPACING, {l0, l1}, {value}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
 	}
 	return result;
 }
 
 vec2i Tech::getEnclosing(int l0, int l1) const {
-	int result = ruleIdx(Rule::ENCLOSING, l0, l1);
+	int result = findRule(Rule::ENCLOSING, {l0, l1});
 	if (result < 0) {
 		vector<int> params = rules[flip(result)].params;
 		if ((int)params.size() == 1) {
@@ -328,39 +248,24 @@ vec2i Tech::getEnclosing(int l0, int l1) const {
 
 // -1 means that one of the sides doesn't need to be enclosed (extension)
 int Tech::setEnclosing(int l0, int l1, int lo, int hi) {
-	int result = ruleIdx(Rule::ENCLOSING, l0, l1);
+	int result = setRule(Rule::ENCLOSING, {l0, l1});
 	if (result != std::numeric_limits<int>::max()) {
 		int idx = flip(result);
-		if (rules[idx].params.empty()) {
-			rules[idx].params.push_back(lo);
-		} else if (lo < rules[idx].params[0]) {
+		if ((int)rules[idx].params.size() < 2) {
+			rules[idx].params.resize(2, -1);
+		}
+		if (lo > rules[idx].params[0]) {
 			rules[idx].params[0] = lo;
 		}
-		if ((int)rules[idx].params.size() < 2) {
-			rules[idx].params.push_back(hi);
-		} else if (hi < rules[idx].params[1]) {
+		if (hi > rules[idx].params[1]) {
 			rules[idx].params[1] = hi;
 		}
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::ENCLOSING, {l0, l1}, {lo, hi}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
-	}
-	if (l1 >= 0) {
-		paint[l1].out.push_back(result);
-	} else {
-		rules[flip(l1)].out.push_back(result);
 	}
 	return result;
 }
 
 int Tech::getWidth(int l0) const {
-	int result = ruleIdx(Rule::WIDTH, l0);
+	int result = findRule(Rule::WIDTH, {l0});
 	if (result < 0) {
 		return rules[flip(result)].params[0];
 	}
@@ -368,26 +273,18 @@ int Tech::getWidth(int l0) const {
 }
 
 int Tech::setWidth(int l0, int value) {
-	int result = ruleIdx(Rule::WIDTH, l0);
+	int result = setRule(Rule::WIDTH, {l0});
 	if (result != std::numeric_limits<int>::max()) {
 		int idx = flip(result);
-		if (value < rules[idx].params[0]) {
+		if ((int)rules[idx].params.size() < 1) {
+			rules[idx].params.resize(1, 0);
+		}
+		if (value > rules[idx].params[0]) {
 			rules[idx].params[0] = value;
 		}
-		return result;
-	}
-
-	result = flip((int)rules.size());
-	rules.push_back(Rule(Rule::WIDTH, {l0}, {value}));
-	if (l0 >= 0) {
-		paint[l0].out.push_back(result);
-	} else {
-		rules[flip(l0)].out.push_back(result);
 	}
 	return result;
 }
-
-
 
 string Tech::print(int layer) const {
 	if (layer >= 0) {
