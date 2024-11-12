@@ -74,6 +74,7 @@ struct Poly {
 	
 	vector<Rect> split();
 	bool empty(); 
+	void normalize();
 };
 
 struct Label {

@@ -309,7 +309,7 @@ int Poly::area() const {
 		int j = (i+1)%(int)v.size();
 		total += (v[i][1]+v[j][1])*(v[i][0]-v[j][0]);
 	}
-	return abs(total)/2;
+	return total/2;
 }
 
 int Poly::perim() const {
@@ -495,6 +495,12 @@ vector<Rect> Poly::split() {
 
 bool Poly::empty() {
 	return ((int)v.size() <= 2 or area() == 0);
+}
+
+void Poly::normalize() {
+	if (area() < 0) {
+		std::reverse(v.begin(), v.end());
+	}
 }
 
 Label::Label() {
@@ -1519,6 +1525,15 @@ void Layout::print() {
 		int j = 0;
 		for (auto rect = layer->second.geo.begin(); rect != layer->second.geo.end(); rect++) {
 			printf("\trect[%d] %s(%d/%d) (%d %d) (%d %d)\n", j, ((rect->net < 0 or rect->net >= (int)nets.size() or nets[rect->net].names.empty()) ? "" : nets[rect->net].names[0].c_str()), rect->net, (int)nets.size(), rect->ll[0], rect->ll[1], rect->ur[0], rect->ur[1]);
+			j++;
+		}
+		j = 0;
+		for (auto gon = layer->second.poly.begin(); gon != layer->second.poly.end(); gon++) {
+			printf("\tpoly[%d] %s(%d/%d)", j, ((gon->net < 0 or gon->net >= (int)nets.size() or nets[gon->net].names.empty()) ? "" : nets[gon->net].names[0].c_str()), gon->net, (int)nets.size());
+			for (auto v = gon->v.begin(); v != gon->v.end(); v++) {
+				printf(" (%d %d)", (*v)[0], (*v)[1]);
+			}
+			printf("\n");
 			j++;
 		}
 		j = 0;
