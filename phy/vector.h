@@ -864,6 +864,11 @@ vec<t, s> min(vec<t, s> v0, vec<t, s> v1)
 	return v0;
 }
 
+template <class t, int s>
+vec<t, s> coord_at(vec<t, s> from, vec<t, s> to, int i, t x) {
+	return (to-from)*(x-from[i])/(to[i]-from[i]);
+}
+
 typedef vec<double,  1>	vec1d;
 typedef vec<double,  2>	vec2d;
 typedef vec<double,  3>	vec3d;

@@ -81,8 +81,48 @@ bool Rect::overlaps(Rect r) const {
 	return ll[0] <= r.ur[0] and r.ll[0] <= ur[0] and ll[1] <= r.ur[1] and r.ll[1] <= ur[1];
 }
 
-bool Rect::contains(vec2i p) const {
-	return p[0] >= ll[0] and p[0] <= ur[0] and p[1] >= ll[1] and p[1] <= ur[1];
+bool Rect::overlaps(vec2i v0, vec2i v1, bool withEdge) const {
+	if (v0[0] != v1[0]) {
+		if ((withEdge and ((v0[0] <= ur[0] and v1[0] >= ll[0]) or (v1[0] <= ur[0] and v0[0] >= ll[0])))
+		or (not withEdge and ((v0[0] < ur[0] and v1[0] > ll[0]) or (v1[0] < ur[0] and v0[0] > ll[0])))) {
+			int left = coord_at(v0, v1, 0, ll[0])[1];
+			int right = coord_at(v0, v1, 0, ur[0])[1];
+
+			if ((withEdge
+					and ((left <= ur[1] and right >= ll[1])
+						or (right <= ur[1] and left >= ll[1])))
+				or (not withEdge
+					and ((left < ur[1] and right > ll[1])
+						or (right < ur[1] and left > ll[1])))) {
+				return true;
+			}
+		}
+	} else if (v0[1] != v1[1]) {
+		if ((withEdge and ((v0[1] <= ur[1] and v1[1] >= ll[1]) or (v1[1] <= ur[1] and v0[1] >= ll[1])))
+		or (not withEdge and ((v0[1] < ur[1] and v1[1] > ll[1]) or (v1[1] < ur[1] and v0[1] > ll[1])))) {
+			int bot = coord_at(v0, v1, 1, ll[1])[0];
+			int top = coord_at(v0, v1, 1, ur[1])[0];
+
+			if ((withEdge
+					and ((bot <= ur[0] and top >= ll[0])
+						or (top <= ur[0] and bot >= ll[0])))
+				or (not withEdge
+					and ((bot < ur[0] and top > ll[0])
+						or (top < ur[0] and bot > ll[0])))) {
+				return true;
+			}
+		}
+	} else if (contains(v0, withEdge)) {
+		return true;
+	}
+	return false;
+}
+
+bool Rect::contains(vec2i p, bool withEdge) const {
+	if (withEdge) {
+		return p[0] >= ll[0] and p[0] <= ur[0] and p[1] >= ll[1] and p[1] <= ur[1];
+	}
+	return p[0] > ll[0] and p[0] < ur[0] and p[1] > ll[1] and p[1] < ur[1];
 }
 
 Rect &Rect::bound(vec2i rll, vec2i rur) {
@@ -206,14 +246,6 @@ Poly::Poly(Rect r) {
 Poly::~Poly() {
 }
 
-int Poly::xAt(vec2i from, vec2i to, int y) const {
-	return (to[0]-from[0])*(y-from[1])/(to[1]-from[1]);
-}
-
-int Poly::yAt(vec2i from, vec2i to, int x) const {
-	return (to[1]-from[1])*(x-from[0])/(to[0]-from[0]);
-}
-
 // == 0: collinear
 // > 0: clockwise
 // < 0: counter-clockwise
@@ -259,23 +291,8 @@ bool Poly::overlaps(Rect r) const {
 	// check if any edge intersects the rect
 	for (int i = 0; i < (int)v.size(); i++) {
 		int j = (i+1)%(int)v.size();
-		if (v[i][1] != v[j][1]) {
-			int bot = xAt(v[i], v[j], r.ll[1]);
-			int top = xAt(v[i], v[j], r.ur[1]);
-			if ((r.ll[0] <= bot and bot <= r.ur[0])
-				or (r.ll[0] <= top and top <= r.ur[0])) {
-				return true;
-			}
-		}
-
-		if (v[i][0] != v[j][0]) {
-			int left = yAt(v[i], v[j], r.ll[0]);
-			int right = yAt(v[i], v[j], r.ur[0]);
-
-			if ((r.ll[1] <= left and left <= r.ur[1])
-				or (r.ll[1] <= right and right <= r.ur[1])) {
-				return true;
-			}
+		if (r.overlaps(v[i], v[j])) {
+			return true;
 		}
 	}
 
@@ -291,12 +308,12 @@ bool Poly::contains(vec2i p) const {
 		int j = (i+1)%(int)v.size();
 		if (v[i][1] < v[j][1]) {
 			windings += (p[1] >= v[i][1] and p[1] < v[j][1]
-			  and ((v[i][1] != v[j][1] and p[0] <= xAt(v[i], v[j], p[1]))
-					or (v[i][0] != v[j][0] and p[1] <= yAt(v[i], v[j], p[0]))));
+			  and ((v[i][1] != v[j][1] and p[0] <= coord_at(v[i], v[j], 1, p[1])[0])
+					or (v[i][0] != v[j][0] and p[1] <= coord_at(v[i], v[j], 0, p[0])[1])));
 		} else if (v[j][1] < v[i][1]) {
 			windings += (p[1] > v[j][1] and p[1] <= v[i][1]
-				and ((v[i][1] != v[j][1] and p[0] <= xAt(v[j], v[i], p[1]))
-					or (v[i][0] != v[j][0] and p[1] <= yAt(v[j], v[i], p[0]))));
+				and ((v[i][1] != v[j][1] and p[0] <= coord_at(v[j], v[i], 1, p[1])[0])
+					or (v[i][0] != v[j][0] and p[1] <= coord_at(v[j], v[i], 0, p[0])[1])));
 		}
 	}
 	return (windings%2) == 1;
@@ -325,8 +342,8 @@ int Poly::perim() const {
 	for (int i = 0; i < (int)v.size(); i++) {
 		int j = (i+1)%(int)v.size();
 		if (v[i][1] != v[j][1]) {
-			int bot = xAt(v[i], v[j], r.ll[1]);
-			int top = xAt(v[i], v[j], r.ur[1]);
+			int bot = coord_at(v[i], v[j], 1, r.ll[1])[0];
+			int top = coord_At(v[i], v[j], 1, r.ur[1])[0];
 			if ((r.ll[0] <= bot and bot <= r.ur[0])
 				or (r.ll[0] <= top and top <= r.ur[0])) {
 				return true;
@@ -334,8 +351,8 @@ int Poly::perim() const {
 		}
 
 		if (v[i][0] != v[j][0]) {
-			int left = yAt(v[i], v[j], r.ll[0]);
-			int right = yAt(v[i], v[j], r.ur[0]);
+			int left = coord_at(v[i], v[j], 0, r.ll[0])[1];
+			int right = coord_at(v[i], v[j], 0, r.ur[0])[1];
 
 			if ((r.ll[1] <= left and left <= r.ur[1])
 				or (r.ll[1] <= right and right <= r.ur[1])) {
@@ -381,7 +398,9 @@ vector<Rect> Poly::split() {
 					// check if this rectangular section of the polygon is convex
 					bool found = false;
 					for (int j = 0; j < (int)v.size() and not found; j++) {
-						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+						int j1 = (j+1)%(int)v.size();
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and j1 != i0
+							and r.overlaps(v[j], v[j1], false));
 					}
 					if (not found) {
 						result.push_back(r);
@@ -408,7 +427,9 @@ vector<Rect> Poly::split() {
 					// check if this rectangular section of the polygon is convex
 					bool found = false;
 					for (int j = 0; j < (int)v.size() and not found; j++) {
-						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+						int j1 = (j+1)%(int)v.size();
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and j1 != i0
+							and r.overlaps(v[j], v[j1], false));
 					}
 					if (not found) {
 						result.push_back(r);
@@ -438,7 +459,9 @@ vector<Rect> Poly::split() {
 					// check if this rectangular section of the polygon is convex
 					bool found = false;
 					for (int j = 0; j < (int)v.size() and not found; j++) {
-						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+						int j1 = (j+1)%(int)v.size();
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and j1 != i0
+							and r.overlaps(v[j], v[j1], false));
 					}
 					if (not found) {
 						result.push_back(r);
@@ -465,7 +488,9 @@ vector<Rect> Poly::split() {
 					// check if this rectangular section of the polygon is convex
 					bool found = false;
 					for (int j = 0; j < (int)v.size() and not found; j++) {
-						found = (j != i0 and j != i1 and j != i2 and j != i3 and r.contains(v[j]));
+						int j1 = (j+1)%(int)v.size();
+						found = (j != i0 and j != i1 and j != i2 and j != i3 and j1 != i0
+							and r.overlaps(v[j], v[j1], false));
 					}
 					if (not found) {
 						result.push_back(r);

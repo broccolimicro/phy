@@ -34,7 +34,8 @@ struct Rect {
 	Rect shift(vec2i pos, vec2i dir=vec2i(1,1)) const;
 	bool merge(Rect r);
 	bool overlaps(Rect r) const;
-	bool contains(vec2i p) const;
+	bool overlaps(vec2i v0, vec2i v1, bool withEdge=true) const;
+	bool contains(vec2i p, bool withEdge=true) const;
 	Rect &bound(vec2i rll, vec2i rur);
 	Rect &bound(Rect r);
 
@@ -53,8 +54,6 @@ struct Poly {
 	int net;
 	vector<vec2i> v;
 
-	int xAt(vec2i from, vec2i to, int y) const;
-	int yAt(vec2i from, vec2i to, int x) const;
 	int orientation(vec2i p, vec2i q, vec2i r) const;
 	bool intersect(vec2i a0, vec2i a1, vec2i b0, vec2i b1) const;
 
