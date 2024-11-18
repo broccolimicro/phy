@@ -32,12 +32,16 @@ Material::Material() {
 	draw = -1;
 	label = -1;
 	pin = -1;
+	thickness = 0;
+	resistivity = 0;
 }
 
-Material::Material(int draw, int label, int pin) {
+Material::Material(int draw, int label, int pin, float thickness, float resistivity) {
 	this->draw = draw;
 	this->pin = pin;
 	this->label = label;
+	this->thickness = thickness;
+	this->resistivity = resistivity;
 }
 
 Material::~Material() {
@@ -60,7 +64,7 @@ Diffusion::Diffusion() : Material() {
 	isWell = false;
 }
 
-Diffusion::Diffusion(int draw, int label, int pin, bool isWell) : Material(draw, label, pin) {
+Diffusion::Diffusion(int draw, int label, int pin, bool isWell, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
 	this->isWell = isWell;
 }
 
@@ -89,7 +93,7 @@ Model::~Model() {
 Routing::Routing() : Material() {
 }
 
-Routing::Routing(int draw, int label, int pin) : Material(draw, label, pin) {
+Routing::Routing(int draw, int label, int pin, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
 }
 
 Routing::~Routing() {
@@ -100,12 +104,29 @@ Via::Via() : Material() {
 	downLevel = 0;
 }
 
-Via::Via(int downLevel, int upLevel, int draw, int label, int pin) : Material(draw, label, pin) {
+Via::Via(int downLevel, int upLevel, int draw, int label, int pin, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
 	this->downLevel = downLevel;
 	this->upLevel = upLevel;
 }
 
 Via::~Via() {
+}
+
+Dielectric::Dielectric() {
+	upLevel = 0;
+	downLevel = 0;
+	thickness = 0.0f;
+	permitivity = 0.0f;
+}
+
+Dielectric::Dielectric(int downLevel, int upLevel, float thickness, float permitivity) {
+	this->downLevel = downLevel;
+	this->upLevel = upLevel;
+	this->thickness = thickness;
+	this->permitivity = permitivity;
+}
+
+Dielectric::~Dielectric() {
 }
 
 Rule::Rule() {

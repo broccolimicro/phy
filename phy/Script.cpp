@@ -274,57 +274,94 @@ static PyObject* py_pmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 	return PyLong_FromLong(result);
 }
 
-static PyObject* py_subst(PyObject *self, PyObject *args) {
+static PyObject* py_dielec(PyObject *self, PyObject *args, PyObject *kwargs) {
+	float downLevel = 0.0f;
+	float upLevel = 0.0f;
+	float thickness = 0.0f;
+	float permitivity = 0.0f;
+
+	static const char *kwlist[] = {"down", "up", "thick", "permit", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iif|f:dielec", const_cast<char **>(kwlist), &downLevel, &upLevel, &thickness, &permitivity)) {
+		return NULL;
+	}
+
+	tech->dielec.push_back(Dielectric(downLevel, upLevel, thickness, permitivity));
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject* py_subst(PyObject *self, PyObject *args, PyObject *kwargs) {
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	if(!PyArg_ParseTuple(args, "i|ii:subst", &draw, &label, &pin)) {
+	float thickness = 0.0f;
+	float resistivity = 0.0f;
+
+	static const char *kwlist[] = {"draw", "label", "pin", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiff:subst", const_cast<char **>(kwlist), &draw, &label, &pin, &thickness, &resistivity)) {
 		return NULL;
 	}
 
 	int result = flip((int)tech->subst.size());
-	tech->subst.push_back(Diffusion(draw, label, pin, false));
+	tech->subst.push_back(Diffusion(draw, label, pin, false, thickness, resistivity));
 	return PyLong_FromLong(result);
 }
 
-static PyObject* py_well(PyObject *self, PyObject *args) {
+static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	if(!PyArg_ParseTuple(args, "i|ii:well", &draw, &label, &pin)) {
+	float thickness = 0.0f;
+	float resistivity = 0.0f;
+
+	static const char *kwlist[] = {"draw", "label", "pin", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiff:well", const_cast<char **>(kwlist), &draw, &label, &pin, &thickness, &resistivity)) {
 		return NULL;
 	}
 
 	int result = flip((int)tech->subst.size());
-	tech->subst.push_back(Diffusion(draw, label, pin, true));
+	tech->subst.push_back(Diffusion(draw, label, pin, true, thickness, resistivity));
 	return PyLong_FromLong(result);
 }
 
-static PyObject* py_via(PyObject *self, PyObject *args) {
+static PyObject* py_via(PyObject *self, PyObject *args, PyObject *kwargs) {
 	int dn = -1;
 	int up = -1;
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	if(!PyArg_ParseTuple(args, "iii|ii:via", &dn, &up, &draw, &label, &pin)) {
+	float thickness = 0.0f;
+	float resistivity = 0.0f;
+
+	static const char *kwlist[] = {"down", "up", "draw", "label", "pin", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iii|iiff:via", const_cast<char **>(kwlist), &dn, &up, &draw, &label, &pin, &thickness, &resistivity)) {
 		return NULL;
 	}
 
 	int result = (int)tech->vias.size();
-	tech->vias.push_back(Via(dn, up, draw, label, pin));
+	tech->vias.push_back(Via(dn, up, draw, label, pin, thickness, resistivity));
 	return PyLong_FromLong(result);
 }
 
-static PyObject* py_route(PyObject *self, PyObject *args) {
+static PyObject* py_route(PyObject *self, PyObject *args, PyObject *kwargs) {
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
-	if(!PyArg_ParseTuple(args, "i|ii:route", &draw, &label, &pin)) {
+	float thickness = 0.0f;
+	float resistivity = 0.0f;
+
+	static const char *kwlist[] = {"draw", "label", "pin", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiff:route", const_cast<char **>(kwlist), &draw, &label, &pin, &thickness, &resistivity)) {
 		return NULL;
 	}
 
 	int result = (int)tech->wires.size();
-	tech->wires.push_back(Routing(draw, label, pin));
+	tech->wires.push_back(Routing(draw, label, pin, thickness, resistivity));
 	return PyLong_FromLong(result);
 }
 
@@ -435,10 +472,11 @@ static PyMethodDef EmbMethods[] = {
 	{"fill", py_fill, METH_VARARGS, "Indicate a fill layer."},
 	{"nmos", (PyCFunction)py_nmos, METH_VARARGS | METH_KEYWORDS, "Create an nmos transistor model."},
 	{"pmos", (PyCFunction)py_pmos, METH_VARARGS | METH_KEYWORDS, "Create a pmos transistor model."},
-	{"subst", py_subst, METH_VARARGS, "Define a diffusion layer."},
-	{"well", py_well, METH_VARARGS, "Define a well layer."},
-	{"via", py_via, METH_VARARGS, "Add a via model."},
-	{"route", py_route, METH_VARARGS, "Add a route model."},
+	{"dielec", (PyCFunction)py_dielec, METH_VARARGS | METH_KEYWORDS, "Define a dielectric layer."},
+	{"subst", (PyCFunction)py_subst, METH_VARARGS | METH_KEYWORDS, "Define a diffusion layer."},
+	{"well", (PyCFunction)py_well, METH_VARARGS | METH_KEYWORDS, "Define a well layer."},
+	{"via", (PyCFunction)py_via, METH_VARARGS | METH_KEYWORDS, "Add a via model."},
+	{"route", (PyCFunction)py_route, METH_VARARGS | METH_KEYWORDS, "Add a route model."},
 	{"spacing", py_spacing, METH_VARARGS, "Add a spacing rule."},
 	{"enclosing", py_enclosing, METH_VARARGS, "Add an enclosing rule."},
 	{"b_and", py_b_and, METH_VARARGS, "Intersect two layers."},

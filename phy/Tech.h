@@ -36,13 +36,16 @@ struct Paint {
 // different purposes.
 struct Material {
 	Material();
-	Material(int draw, int label=-1, int pin=-1);
+	Material(int draw, int label=-1, int pin=-1, float thickness=0.0f, float resistivity=0.0f);
 	~Material();
 	
 	// these index into Tech::paint
 	int draw;
 	int label;
 	int pin;
+
+	float thickness;
+	float resistivity;
 
 	bool contains(int layer) const;
 
@@ -53,7 +56,7 @@ struct Material {
 // This specifies a diffusion layer for drawing transistors
 struct Diffusion : Material {
 	Diffusion();
-	Diffusion(int draw, int label=-1, int pin=-1, bool isWell=false);
+	Diffusion(int draw, int label=-1, int pin=-1, bool isWell=false, float thickness=0.0f, float resistivity=0.0f);
 	~Diffusion();
 
 	bool isWell;
@@ -88,14 +91,14 @@ struct Model {
 // terminals
 struct Routing : Material {
 	Routing();
-	Routing(int draw, int label, int pin);
+	Routing(int draw, int label, int pin, float thickness=0.0f, float resistivity=0.0f);
 	~Routing();
 };
 
 // Connect two layers with a via
 struct Via : Material {
 	Via();
-	Via(int downLevel, int upLevel, int draw, int label=-1, int pin=-1);
+	Via(int downLevel, int upLevel, int draw, int label=-1, int pin=-1, float thickness=0.0f, float resistivity=0.0f);
 	~Via();
 
 	// index into Tech::wires when >= 0
@@ -103,6 +106,18 @@ struct Via : Material {
 	// use flip() to access the index when negative.
 	int downLevel;
 	int upLevel;
+};
+
+struct Dielectric {
+	Dielectric();
+	Dielectric(int downLevel, int upLevel, float thickness=0.0f, float permitivity=0.0f);
+	~Dielectric();
+
+	int downLevel;
+	int upLevel;
+	
+	float thickness;
+	float permitivity;
 };
 
 // This implements a DRC operation on the geometry. There are 3 kinds of DRC
@@ -166,6 +181,9 @@ struct Tech {
 	// All of the GDS layers we can use for layout
 	vector<Paint> paint;
 
+	// The diffusion and well layers (substrate)
+	vector<Diffusion> subst;
+
 	// different types of transistors (for example nmos and pmos for svt, hvt, and lvt)
 	vector<Model> models;
 
@@ -180,8 +198,8 @@ struct Tech {
 	// interconnect) at index 1, then the metal layers (m1, m2, m3, ...)
 	vector<Routing> wires;
 
-	// The diffusion and well layers (substrate)
-	vector<Diffusion> subst;
+	// The dielectric layers between routing layers, substrate layers, etc
+	vector<Dielectric> dielec;
 
 	// the list of all DRC rules that we need to check. See Rule for more
 	// information.
