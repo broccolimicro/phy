@@ -396,6 +396,16 @@ int Tech::findModel(string name) const {
 	return -1;
 }
 
+int Tech::findModel(int type, string variant) const {
+	for (int i = 0; i < (int)models.size(); i++) {
+		if (models[i].type == type and models[i].variant == variant) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 const Material *Tech::findMaterial(int layer) const {
 	for (int j = 0; j < (int)subst.size(); j++) {
 		if (subst[j].contains(layer)) {

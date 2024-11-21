@@ -265,6 +265,7 @@ struct Tech {
 	int findPaint(string name) const;
 	int findPaint(int major, int minor) const;
 	int findModel(string name) const;
+	int findModel(int type, string variant) const;
 	const Material *findMaterial(int layer) const;
 
 	bool isRouting(int layer) const;
