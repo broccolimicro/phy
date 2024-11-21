@@ -45,6 +45,30 @@ namespace phy {
 
 Tech *tech;
 
+static PyObject* tupleFromLevel(Level level) {
+	return Py_BuildValue("(ii)", level.type, level.idx);
+}
+
+static Level levelFromTuple(PyObject *obj) {
+	if (obj == nullptr or PyTuple_Size(obj) != 2) {
+		PyErr_SetString(PyExc_TypeError, "Level must have 2 elements (type and idx)");
+		return Level();
+	}
+
+	PyObject *p0 = PyTuple_GetItem(obj, 0);
+	PyObject *p1 = PyTuple_GetItem(obj, 1);
+	if (!PyLong_Check(p0)) {
+			PyErr_SetString(PyExc_TypeError, "Level type must be an integer.");
+			return Level();
+	}
+	if (!PyLong_Check(p1)) {
+			PyErr_SetString(PyExc_TypeError, "Level idx must be an integer.");
+			return Level();
+	}
+
+	return Level(PyLong_AsLong(p0), PyLong_AsLong(p1));
+}
+
 static PyObject* py_dbunit(PyObject *self, PyObject *args) {
 	double dbunit = -1;
 	if(!PyArg_ParseTuple(args, "d:dbunit", &dbunit)) {
@@ -103,49 +127,18 @@ static PyObject* py_fill(PyObject *self, PyObject *args) {
 static PyObject* py_nmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 	const char *variant = 0;
 	const char *name = 0;
+
+	PyObject *diff = nullptr;
 	
-	PyObject *l0 = nullptr;
-	PyObject *l1 = nullptr;
 	PyObject *l2 = nullptr;
 	PyObject *pItem;
 	PyObject *pSub;
 	Py_ssize_t n;
 
-	static const char *kwlist[] = {"variant", "name", "stack", "exclude", "bins", NULL};
+	static const char *kwlist[] = {"variant", "name", "diff", "bins", NULL};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!O!:nmos", const_cast<char **>(kwlist), &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1, &PyList_Type, &l2)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!:nmos", const_cast<char **>(kwlist), &variant, &name, &PyTuple_Type, &diff, &PyList_Type, &l2)) {
 		return NULL;
-	}
-
-	vector<int> stack;
-	if (l0 != nullptr) {
-		n = PyList_Size(l0);
-		for (int i = 0; i < n; i++) {
-			pItem = PyList_GetItem(l0, i);
-			if(!PyLong_Check(pItem)) {
-					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-					return NULL;
-			}
-			int layer = PyLong_AsLong(pItem);
-			if (layer >= 0) {
-				PyErr_SetString(PyExc_TypeError, "stack layers must be materials.");
-				return NULL;
-			}
-			stack.push_back(layer);
-		}
-	}
-
-	vector<int> excl;
-	if (l1 != nullptr) {
-		n = PyList_Size(l1);
-		for (int i = 0; i < n; i++) {
-			pItem = PyList_GetItem(l1, i);
-			if(!PyLong_Check(pItem)) {
-					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-					return NULL;
-			}
-			excl.push_back(PyLong_AsLong(pItem));
-		}
 	}
 
 	vector<pair<int, int> > bins;
@@ -182,57 +175,26 @@ static PyObject* py_nmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 		}
 	}
 
-	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::NMOS, variant, name, stack, excl, bins));
-	return PyLong_FromLong(result);
+	tech->models.push_back(Model(Model::NMOS, variant, name, levelFromTuple(diff), bins));
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 static PyObject* py_pmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 	const char *variant = 0;
 	const char *name = 0;
 	
-	PyObject *l0 = nullptr;
-	PyObject *l1 = nullptr;
+	PyObject *diff = nullptr;
+
 	PyObject *l2 = nullptr;
 	PyObject *pItem;
 	PyObject *pSub;
 	Py_ssize_t n;
 
-	static const char *kwlist[] = {"variant", "name", "stack", "exclude", "bins", NULL};
+	static const char *kwlist[] = {"variant", "name", "diff", "bins", NULL};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!O!:pmos", const_cast<char **>(kwlist), &variant, &name, &PyList_Type, &l0, &PyList_Type, &l1, &PyList_Type, &l2)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "ssO!|O!:pmos", const_cast<char **>(kwlist), &variant, &name, &PyTuple_Type, &diff, &PyList_Type, &l2)) {
 		return NULL;
-	}
-
-	vector<int> stack;
-	if (l0 != nullptr) {
-		n = PyList_Size(l0);
-		for (int i = 0; i < n; i++) {
-			pItem = PyList_GetItem(l0, i);
-			if(!PyLong_Check(pItem)) {
-					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-					return NULL;
-			}
-			int layer = PyLong_AsLong(pItem);
-			if (layer >= 0) {
-				PyErr_SetString(PyExc_TypeError, "stack layers must be materials.");
-				return NULL;
-			}
-			stack.push_back(layer);
-		}
-	}
-
-	vector<int> excl;
-	if (l1 != nullptr) {
-		n = PyList_Size(l1);
-		for (int i = 0; i < n; i++) {
-			pItem = PyList_GetItem(l1, i);
-			if(!PyLong_Check(pItem)) {
-					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
-					return NULL;
-			}
-			excl.push_back(PyLong_AsLong(pItem));
-		}
 	}
 
 	vector<pair<int, int> > bins;
@@ -269,24 +231,24 @@ static PyObject* py_pmos(PyObject *self, PyObject *args, PyObject *kwargs) {
 		}
 	}
 
-	int result = flip(tech->models.size());
-	tech->models.push_back(Model(Model::PMOS, variant, name, stack, excl, bins));
-	return PyLong_FromLong(result);
+	tech->models.push_back(Model(Model::PMOS, variant, name, levelFromTuple(diff), bins));
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 static PyObject* py_dielec(PyObject *self, PyObject *args, PyObject *kwargs) {
-	float downLevel = 0.0f;
-	float upLevel = 0.0f;
+	PyObject *down = nullptr;
+	PyObject *up = nullptr;
 	float thickness = 0.0f;
 	float permitivity = 0.0f;
 
 	static const char *kwlist[] = {"down", "up", "thick", "permit", NULL};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iif|f:dielec", const_cast<char **>(kwlist), &downLevel, &upLevel, &thickness, &permitivity)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!f|f:dielec", const_cast<char **>(kwlist), &PyTuple_Type, &down, &PyTuple_Type, &up, &thickness, &permitivity)) {
 		return NULL;
 	}
 
-	tech->dielec.push_back(Dielectric(downLevel, upLevel, thickness, permitivity));
+	tech->dielec.push_back(Dielectric(levelFromTuple(down), levelFromTuple(up), thickness, permitivity));
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -298,15 +260,50 @@ static PyObject* py_subst(PyObject *self, PyObject *args, PyObject *kwargs) {
 	float thickness = 0.0f;
 	float resistivity = 0.0f;
 
-	static const char *kwlist[] = {"draw", "label", "pin", "thick", "resist", NULL};
+	PyObject *well = nullptr;
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiff:subst", const_cast<char **>(kwlist), &draw, &label, &pin, &thickness, &resistivity)) {
+	PyObject *l0 = nullptr;
+	PyObject *l1 = nullptr;
+	PyObject *pItem;
+	Py_ssize_t n;
+
+	static const char *kwlist[] = {"draw", "label", "pin", "mask", "excl", "well", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiO!O!O!ff:subst", const_cast<char **>(kwlist), &draw, &label, &pin, &PyList_Type, &l0, &PyList_Type, &l1, &PyTuple_Type, &well, &thickness, &resistivity)) {
 		return NULL;
 	}
 
-	int result = flip((int)tech->subst.size());
-	tech->subst.push_back(Diffusion(draw, label, pin, false, thickness, resistivity));
-	return PyLong_FromLong(result);
+	vector<int> mask;
+	if (l0 != nullptr) {
+		n = PyList_Size(l0);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l0, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			mask.push_back(PyLong_AsLong(pItem));
+		}
+	}
+
+	vector<int> excl;
+	if (l1 != nullptr) {
+		n = PyList_Size(l1);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l1, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			excl.push_back(PyLong_AsLong(pItem));
+		}
+	}
+
+	int result = (int)tech->subst.size();
+	tech->subst.push_back(Substrate(draw, label, pin, levelFromTuple(well), thickness, resistivity));
+	tech->subst.back().mask = mask;
+	tech->subst.back().excl = excl;
+	return tupleFromLevel(Level(Level::SUBST, result));
 }
 
 static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
@@ -316,20 +313,53 @@ static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
 	float thickness = 0.0f;
 	float resistivity = 0.0f;
 
-	static const char *kwlist[] = {"draw", "label", "pin", "thick", "resist", NULL};
+	PyObject *l0 = nullptr;
+	PyObject *l1 = nullptr;
+	PyObject *pItem;
+	Py_ssize_t n;
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiff:well", const_cast<char **>(kwlist), &draw, &label, &pin, &thickness, &resistivity)) {
+	static const char *kwlist[] = {"draw", "label", "pin", "mask", "excl", "thick", "resist", NULL};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "i|iiO!O!ff:well", const_cast<char **>(kwlist), &draw, &label, &pin, &PyList_Type, &l0, &PyList_Type, &l1, &thickness, &resistivity)) {
 		return NULL;
 	}
 
-	int result = flip((int)tech->subst.size());
-	tech->subst.push_back(Diffusion(draw, label, pin, true, thickness, resistivity));
-	return PyLong_FromLong(result);
+	vector<int> mask;
+	if (l0 != nullptr) {
+		n = PyList_Size(l0);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l0, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			mask.push_back(PyLong_AsLong(pItem));
+		}
+	}
+
+	vector<int> excl;
+	if (l1 != nullptr) {
+		n = PyList_Size(l1);
+		for (int i = 0; i < n; i++) {
+			pItem = PyList_GetItem(l1, i);
+			if(!PyLong_Check(pItem)) {
+					PyErr_SetString(PyExc_TypeError, "list items must be integers.");
+					return NULL;
+			}
+			excl.push_back(PyLong_AsLong(pItem));
+		}
+	}
+
+	int result = (int)tech->subst.size();
+	tech->subst.push_back(Substrate(draw, label, pin, Level(), thickness, resistivity));
+	tech->subst.back().mask = mask;
+	tech->subst.back().excl = excl;
+	return tupleFromLevel(Level(Level::SUBST, result));
 }
 
 static PyObject* py_via(PyObject *self, PyObject *args, PyObject *kwargs) {
-	int dn = -1;
-	int up = -1;
+	PyObject *dn = nullptr;
+	PyObject *up = nullptr;
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
@@ -338,13 +368,13 @@ static PyObject* py_via(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 	static const char *kwlist[] = {"down", "up", "draw", "label", "pin", "thick", "resist", NULL};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iii|iiff:via", const_cast<char **>(kwlist), &dn, &up, &draw, &label, &pin, &thickness, &resistivity)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!i|iiff:via", const_cast<char **>(kwlist), &PyTuple_Type, &dn, &PyTuple_Type, &up, &draw, &label, &pin, &thickness, &resistivity)) {
 		return NULL;
 	}
 
 	int result = (int)tech->vias.size();
-	tech->vias.push_back(Via(dn, up, draw, label, pin, thickness, resistivity));
-	return PyLong_FromLong(result);
+	tech->vias.push_back(Via(levelFromTuple(dn), levelFromTuple(up), draw, label, pin, thickness, resistivity));
+	return tupleFromLevel(Level(Level::VIA, result));
 }
 
 static PyObject* py_route(PyObject *self, PyObject *args, PyObject *kwargs) {
@@ -362,7 +392,7 @@ static PyObject* py_route(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 	int result = (int)tech->wires.size();
 	tech->wires.push_back(Routing(draw, label, pin, thickness, resistivity));
-	return PyLong_FromLong(result);
+	return tupleFromLevel(Level(Level::ROUTE, result));
 }
 
 static PyObject* py_spacing(PyObject *self, PyObject *args) {

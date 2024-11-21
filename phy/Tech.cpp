@@ -28,6 +28,47 @@ Paint::Paint(string name, int major, int minor) {
 Paint::~Paint() {
 }
 
+Level::Level() {
+	type = Level::INVALID;
+	idx = 0;
+}
+
+Level::Level(int type, int idx) {
+	this->type = type;
+	this->idx = idx;
+}
+
+Level::~Level() {
+}
+
+bool Level::valid() const {
+	return type != Level::INVALID;
+}
+
+bool operator==(Level l0, Level l1) {
+	return l0.type == l1.type and l0.idx == l1.idx;
+}
+
+bool operator!=(Level l0, Level l1) {
+	return l0.type != l1.type or l0.idx != l1.idx;
+}
+
+bool operator<(Level l0, Level l1) {
+	return l0.type < l1.type or (l0.type == l1.type and l0.idx < l1.idx);
+}
+
+bool operator>(Level l0, Level l1) {
+	return l0.type > l1.type or (l0.type == l1.type and l0.idx > l1.idx);
+}
+
+bool operator<=(Level l0, Level l1) {
+	return l0.type < l1.type or (l0.type == l1.type and l0.idx <= l1.idx);
+}
+
+bool operator>=(Level l0, Level l1) {
+	return l0.type > l1.type or (l0.type == l1.type and l0.idx >= l1.idx);
+}
+
 Material::Material() {
 	draw = -1;
 	label = -1;
@@ -48,7 +89,7 @@ Material::~Material() {
 }
 
 bool Material::contains(int layer) const {
-	return layer == draw or layer == label or layer == pin;
+	return layer == draw or layer == label or layer == pin or find(mask.begin(), mask.end(), layer) != mask.end();
 }
 
 int Material::size() const {
@@ -60,15 +101,18 @@ int Material::at(int idx) const {
 	return arr[idx];
 }
 
-Diffusion::Diffusion() : Material() {
-	isWell = false;
+bool Material::hasDraw() const {
+	return draw >= 0;
 }
 
-Diffusion::Diffusion(int draw, int label, int pin, bool isWell, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
-	this->isWell = isWell;
+Substrate::Substrate() : Material() {
 }
 
-Diffusion::~Diffusion() {
+Substrate::Substrate(int draw, int label, int pin, Level well, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
+	this->well = well;
+}
+
+Substrate::~Substrate() {
 }
 
 Model::Model() {
@@ -77,12 +121,11 @@ Model::Model() {
 	type = NMOS;
 }
 
-Model::Model(int type, string variant, string name, vector<int> stack, vector<int> excl, vector<pair<int, int> > bins) {
+Model::Model(int type, string variant, string name, Level diff, vector<pair<int, int> > bins) {
 	this->variant = variant;
 	this->name = name;
 	this->type = type;
-	this->stack = stack;
-	this->excl = excl;
+	this->diff = diff;
 	this->bins = bins;
 	std::sort(this->bins.begin(), this->bins.end());
 }
@@ -100,28 +143,24 @@ Routing::~Routing() {
 }
 
 Via::Via() : Material() {
-	upLevel = 0;
-	downLevel = 0;
 }
 
-Via::Via(int downLevel, int upLevel, int draw, int label, int pin, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
-	this->downLevel = downLevel;
-	this->upLevel = upLevel;
+Via::Via(Level down, Level up, int draw, int label, int pin, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
+	this->down = down;
+	this->up = up;
 }
 
 Via::~Via() {
 }
 
 Dielectric::Dielectric() {
-	upLevel = 0;
-	downLevel = 0;
 	thickness = 0.0f;
 	permitivity = 0.0f;
 }
 
-Dielectric::Dielectric(int downLevel, int upLevel, float thickness, float permitivity) {
-	this->downLevel = downLevel;
-	this->upLevel = upLevel;
+Dielectric::Dielectric(Level down, Level up, float thickness, float permitivity) {
+	this->down = down;
+	this->up = up;
 	this->thickness = thickness;
 	this->permitivity = permitivity;
 }
@@ -357,13 +396,6 @@ int Tech::findModel(string name) const {
 	return -1;
 }
 
-const Material *Tech::atMaterial(int level) const {
-	if (level < 0) {
-		return &subst[models[flip(level)].stack[0]];
-	}
-	return &wires[level];
-}
-
 const Material *Tech::findMaterial(int layer) const {
 	for (int j = 0; j < (int)subst.size(); j++) {
 		if (subst[j].contains(layer)) {
@@ -385,24 +417,6 @@ const Material *Tech::findMaterial(int layer) const {
 	return nullptr;
 }
 
-vector<int> Tech::findVias(int downLevel, int upLevel) const {
-	int curr = downLevel;
-	
-	vector<int> result;
-	bool done = false;
-	while (not done) {
-		done = true;
-		for (int i = 0; curr != upLevel and i < (int)vias.size(); i++) {
-			if (vias[i].downLevel == curr) {
-				result.push_back(i);
-				curr = vias[i].upLevel;
-				done = false;
-			}
-		}
-	}
-	return result;
-}
-
 bool Tech::isRouting(int layer) const {
 	for (auto wire = wires.begin(); wire != wires.end(); wire++) {
 		if (layer == wire->draw) {
@@ -421,7 +435,7 @@ bool Tech::isRouting(int layer) const {
 
 bool Tech::isSubstrate(int layer) const {
 	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
-		if (layer == mat->draw) {
+		if (mat->contains(layer)) {
 			return true;
 		}
 	}
@@ -475,7 +489,7 @@ bool Tech::isLabel(int layer) const {
 
 bool Tech::isWell(int layer) const {
 	for (auto mat = subst.begin(); mat != subst.end(); mat++) {
-		if (mat->isWell and mat->contains(layer)) {
+		if (not mat->well.valid() and mat->contains(layer)) {
 			return true;
 		}
 	}
@@ -483,5 +497,31 @@ bool Tech::isWell(int layer) const {
 	return false;
 }
 
+const Material &Tech::at(Level level) const {
+	if (level.type == Level::SUBST) {
+		return subst[level.idx];
+	} else if (level.type == Level::VIA) {
+		return vias[level.idx];
+	}
+	return wires[level.idx];
+}
+
+vector<int> Tech::via(Level down, Level up) const {
+	Level curr = down;
+	
+	vector<int> result;
+	bool done = false;
+	while (not done) {
+		done = true;
+		for (int i = 0; curr != up and i < (int)vias.size(); i++) {
+			if (vias[i].down == curr) {
+				result.push_back(i);
+				curr = vias[i].up;
+				done = false;
+			}
+		}
+	}
+	return result;
+}
 
 }

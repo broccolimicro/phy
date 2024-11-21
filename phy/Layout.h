@@ -36,8 +36,13 @@ struct Rect {
 	bool overlaps(Rect r) const;
 	bool overlaps(vec2i v0, vec2i v1, bool withEdge=true) const;
 	bool contains(vec2i p, bool withEdge=true) const;
+	Rect &bound(vec2i p);
 	Rect &bound(vec2i rll, vec2i rur);
 	Rect &bound(Rect r);
+	Rect &bound(Poly gon);
+
+	void grow(vec2i d);
+	bool shrink(vec2i d);
 
 	vec2i center() const;
 	int area() const;
@@ -74,6 +79,9 @@ struct Poly {
 	vector<Rect> split();
 	bool empty(); 
 	void normalize();
+
+	void grow(vec2i d);
+	bool shrink(vec2i d);
 };
 
 struct Label {
@@ -120,12 +128,14 @@ struct Layer {
 	vector<Rect> geo;
 	vector<Poly> poly;
 	vector<Label> lbl;
+	Rect box;
 
 	// flags to help pull apart spacing rules for cell construction
 	bool isRouting;
 	bool isSubstrate;
 	bool isPin;
 	bool isWell;
+
 	
 	/////////////////////////////////////////////
 	// these optimize performance in the minOffset computation
@@ -138,22 +148,22 @@ struct Layer {
 
 	bool isFill() const;
 
+	bool empty() const;
 	void clear();
 	void sync() const;
 
-	void push(Rect rect, bool doSync=false);
-	void push(vector<Rect> rects, bool doSync=false);
-	void push(Poly gon, bool doSync=false);
-	void push(vector<Poly> gons, bool doSync=false);
+	void push(Rect rect);
+	void push(vector<Rect> rects);
+	void push(Poly gon);
+	void push(vector<Poly> gons);
 
-	void erase(int index, bool doSync=false);
+	void erase(int index);
 
 	void label(Label lbl);
 	void label(vector<Label> lbls);
 
-	Rect bbox() const;
 	void normalize();
-	Layer &merge(bool doSync=false);
+	Layer &merge();
 
 	Layer clamp(int axis, int lo, int hi) const;
 	Layer &shift(vec2i pos, vec2i dir=vec2i(1,1));
@@ -166,6 +176,8 @@ struct Layer {
 
 	bool overlaps(const Rect &r0) const;
 	bool overlaps(const Layer &l0) const;
+	
+	void print();
 };
 
 bool operator<(const Layer &l0, const Layer &l1);
@@ -245,30 +257,33 @@ struct Layout {
 	map<int, Layer>::const_iterator find(int draw) const;
 	map<int, Layer>::iterator find(int draw);
 	map<int, Layer>::iterator at(int draw);
-	void push(int layer, Rect rect, bool doSync=false);
-	void push(int layer, vector<Rect> rects, bool doSync=false);
-	void push(const Material &mat, Rect rect, bool doSync=false);
-	void push(const Material &mat, vector<Rect> rects, bool doSync=false);
 
-	void push(int layer, Poly gon, bool doSync=false);
-	void push(int layer, vector<Poly> gons, bool doSync=false);
-	void push(const Material &mat, Poly gon, bool doSync=false);
-	void push(const Material &mat, vector<Poly> gons, bool doSync=false);
+	Layer get(Level level);
+
+	void push(int layer, Rect rect);
+	void push(int layer, vector<Rect> rects);
+	vec2i push(Level level, Rect rect, int base=-1, int axis=0);
+	vec2i push(Level level, vector<Rect> rects, int base=-1, int axis=0);
+
+	void push(int layer, Poly gon);
+	void push(int layer, vector<Poly> gons);
+	vec2i push(Level level, Poly gon, int base=-1, int axis=0);
+	vec2i push(Level level, vector<Poly> gons, int base=-1, int axis=0);
 
 	void label(int layer, Label lbl);
 	void label(int layer, vector<Label> lbls);
-	void label(const Material &mat, Label lbl);
-	void label(const Material &mat, vector<Label> lbls);
+	void label(Level level, Label lbl);
+	void label(Level level, vector<Label> lbls);
 
 	int netAt(string name);
 
-	Rect bbox() const;
 	void normalize();
-	void merge(bool doSync=false);
+	void merge();
 
 	// trace the geometry to understand the structure of the nets
 	void trace();
 
+	bool empty() const;
 	void clear();
 
 	void print();

@@ -32,6 +32,31 @@ struct Paint {
 	vector<int> out;
 };
 
+struct Level {
+	Level();
+	Level(int type, int idx);
+	~Level();
+
+	enum {
+		INVALID = 0,
+		SUBST = 1,
+		ROUTE = 2,
+		VIA = 3
+	};
+
+	int type;
+	int idx;
+
+	bool valid() const;
+};
+
+bool operator==(Level l0, Level l1);
+bool operator!=(Level l0, Level l1);
+bool operator<(Level l0, Level l1);
+bool operator>(Level l0, Level l1);
+bool operator<=(Level l0, Level l1);
+bool operator>=(Level l0, Level l1);
+
 // This is a base class that makes it easier for us to draw layers for
 // different purposes.
 struct Material {
@@ -39,33 +64,42 @@ struct Material {
 	Material(int draw, int label=-1, int pin=-1, float thickness=0.0f, float resistivity=0.0f);
 	~Material();
 	
-	// these index into Tech::paint
+	// these index into Tech::paint or Tech::rules
 	int draw;
 	int label;
 	int pin;
 
-	float thickness;
-	float resistivity;
+	// mask layers that define properties of this specific material
+	vector<int> mask;
+	vector<int> excl;
+
+	float thickness; // um
+	// This is computed by multiplying sheet resistance (mOhms / sq) by thickness
+	// (um) to get (mOhms / um) then divide by 1000 to get (Ohms / um)
+	// p = Rs*t/1000
+	float resistivity; // Ohms / um
 
 	bool contains(int layer) const;
 
 	int size() const;
 	int at(int idx) const;
+
+	bool hasDraw() const;
 };
 
 // This specifies a diffusion layer for drawing transistors
-struct Diffusion : Material {
-	Diffusion();
-	Diffusion(int draw, int label=-1, int pin=-1, bool isWell=false, float thickness=0.0f, float resistivity=0.0f);
-	~Diffusion();
+struct Substrate : Material {
+	Substrate();
+	Substrate(int draw, int label=-1, int pin=-1, Level well=Level(), float thickness=0.0f, float resistivity=0.0f);
+	~Substrate();
 
-	bool isWell;
+	Level well;
 };
 
 // This structure records how to draw a transistor
 struct Model {
 	Model();
-	Model(int type, string variant, string name, vector<int> stack, vector<int> excl=vector<int>(), vector<pair<int, int> > bins=vector<pair<int, int> >());
+	Model(int type, string variant, string name, Level diff, vector<pair<int, int> > bins=vector<pair<int, int> >());
 	~Model();
 
 	// Type of transistor (nmos or pmos)
@@ -82,8 +116,7 @@ struct Model {
 
 	// All of the diffusion layers starting top down
 	// index into Tech::subst
-	vector<int> stack;
-	vector<int> excl;
+	Level diff;
 	vector<pair<int, int> > bins;
 };
 
@@ -98,26 +131,27 @@ struct Routing : Material {
 // Connect two layers with a via
 struct Via : Material {
 	Via();
-	Via(int downLevel, int upLevel, int draw, int label=-1, int pin=-1, float thickness=0.0f, float resistivity=0.0f);
+	Via(Level down, Level up, int draw, int label=-1, int pin=-1, float thickness=0.0f, float resistivity=0.0f);
 	~Via();
 
-	// index into Tech::wires when >= 0
-	// index into Tech::models when < 0
-	// use flip() to access the index when negative.
-	int downLevel;
-	int upLevel;
+	Level down;
+	Level up;
 };
 
 struct Dielectric {
 	Dielectric();
-	Dielectric(int downLevel, int upLevel, float thickness=0.0f, float permitivity=0.0f);
+	Dielectric(Level down, Level up, float thickness=0.0f, float permitivity=0.0f);
 	~Dielectric();
 
-	int downLevel;
-	int upLevel;
+	Level down;
+	Level up;
 	
-	float thickness;
-	float permitivity;
+	float thickness; // um
+	// C = parallel plate capacitance (aF / um^2)
+	// d = distance or thickness (um)
+	// e = permitivity (aF / um)
+	// e = C*d
+	float permitivity; // aF / um
 };
 
 // This implements a DRC operation on the geometry. There are 3 kinds of DRC
@@ -182,10 +216,14 @@ struct Tech {
 	vector<Paint> paint;
 
 	// The diffusion and well layers (substrate)
-	vector<Diffusion> subst;
+	vector<Substrate> subst;
 
 	// different types of transistors (for example nmos and pmos for svt, hvt, and lvt)
 	vector<Model> models;
+
+	// The routing layers starting with poly at index 0, then li (local
+	// interconnect) at index 1, then the metal layers (m1, m2, m3, ...)
+	vector<Routing> wires;
 
 	// Vias at different layers. Each via has a downLevel and upLevel to dictate
 	// which model or wire they connect. If the downLevel or upLevel is negative,
@@ -194,10 +232,6 @@ struct Tech {
 	// index into Tech::wires connecting to that routing layer.
 	vector<Via> vias;
 
-	// The routing layers starting with poly at index 0, then li (local
-	// interconnect) at index 1, then the metal layers (m1, m2, m3, ...)
-	vector<Routing> wires;
-
 	// The dielectric layers between routing layers, substrate layers, etc
 	vector<Dielectric> dielec;
 
@@ -205,6 +239,9 @@ struct Tech {
 	// information.
 	vector<Rule> rules;
 
+	// layer - paint layers or operations on them
+	// layer < 0 refers to "rules"
+	// layer >= 0 refers to "paint"
 	int findRule(int type, vector<int> operands) const;
 	int setRule(int type, vector<int> operands);
 	int getOr(vector<int> layers) const;
@@ -228,15 +265,17 @@ struct Tech {
 	int findPaint(string name) const;
 	int findPaint(int major, int minor) const;
 	int findModel(string name) const;
-	const Material *atMaterial(int level) const;
 	const Material *findMaterial(int layer) const;
-	vector<int> findVias(int downLevel, int upLevel) const;
 
 	bool isRouting(int layer) const;
 	bool isSubstrate(int layer) const;
 	bool isPin(int layer) const;
 	bool isLabel(int layer) const;
 	bool isWell(int layer) const;
+
+	// level - physical levels on the chip
+	const Material &at(Level level) const;
+	vector<int> via(Level down, Level up) const;
 };
 
 }

@@ -125,6 +125,26 @@ bool Rect::contains(vec2i p, bool withEdge) const {
 	return p[0] > ll[0] and p[0] < ur[0] and p[1] > ll[1] and p[1] < ur[1];
 }
 
+Rect &Rect::bound(vec2i p) {
+	if (p[0] < ll[0]) {
+		ll[0] = p[0];
+	}
+
+	if (p[1] < ll[1]) {
+		ll[1] = p[1];
+	}
+
+	if (p[0] > ur[0]) {
+		ur[0] = p[0];
+	}
+
+	if (p[1] > ur[1]) {
+		ur[1] = p[1];
+	}
+
+	return *this;
+}
+
 Rect &Rect::bound(vec2i rll, vec2i rur) {
 	if (ll[0] == ur[0] and ll[1] == ur[1]) {
 		ll = rll;
@@ -206,6 +226,29 @@ Rect &Rect::bound(Rect r) {
 		ur[1] = r.ur[1];
 	}
 	return *this;
+}
+
+Rect &Rect::bound(Poly gon) {
+	if (ll[0] == ur[0] and ll[1] == ur[1]) {
+		ll = gon.v[0];
+		ur = gon.v[0];
+	}
+
+	for (auto i = gon.v.begin(); i != gon.v.end(); i++) {
+		bound(*i);
+	}
+	return *this;
+}
+
+void Rect::grow(vec2i d) {
+	ll -= d;
+	ur += d;
+}
+
+bool Rect::shrink(vec2i d) {
+	ur -= d;
+	ll += d;
+	return (ll[0] < ur[0] and ll[1] < ur[1]);
 }
 
 vec2i Rect::center() const {
@@ -370,6 +413,8 @@ bool Poly::add(Poly p) {
 }*/
 
 vector<Rect> Poly::split() {
+	// TODO(edward.bingham) there's a bug here that adds extra area to the end result.
+	
 	vector<Rect> result;
 	bool done = false;
 	while (not done) {
@@ -528,6 +573,15 @@ void Poly::normalize() {
 	}
 }
 
+void Poly::grow(vec2i d) {
+	// TODO(edward.bingham) implement this
+}
+
+bool Poly::shrink(vec2i d) {
+	// TODO(edward.bingham) implement this
+	return false;
+}
+
 Label::Label() {
 	net = -1;
 	pos = vec2i(0,0);
@@ -611,8 +665,15 @@ bool Layer::isFill() const {
 	return tech->paint[draw].fill;
 }
 
+bool Layer::empty() const {
+	return geo.empty() and poly.empty() and lbl.empty();
+}
+
 void Layer::clear() {
 	geo.clear();
+	poly.clear();
+	lbl.clear();
+	box = Rect();
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 2; j++) {
 			bound[i][j].clear();
@@ -637,71 +698,39 @@ void Layer::sync() const {
 	dirty = false;
 }
 
-void Layer::push(Rect rect, bool doSync) {
-	int index = (int)geo.size();
+void Layer::push(Rect rect) {
 	if (rect.ll[0] < rect.ur[0] and rect.ll[1] < rect.ur[1]) {
 		geo.push_back(rect);
-		dirty = dirty or not doSync;
-		if (not dirty) {
-			for (int axis = 0; axis < 2; axis++) {
-				for (int fromTo = 0; fromTo < 2; fromTo++) {
-					vector<Bound> &bounds = bound[axis][fromTo];
-
-					auto loc = lower_bound(bounds.begin(), bounds.end(), rect[fromTo][axis]); 
-					bounds.insert(loc, Bound(rect[fromTo][axis], index));
-				}
-			}
-		}
+		box.bound(rect);
+		dirty = true;
 	}
 }
 
-void Layer::push(vector<Rect> rects, bool doSync) {
-	int index = (int)geo.size();
+void Layer::push(vector<Rect> rects) {
 	geo.insert(geo.end(), rects.begin(), rects.end());
-	dirty = dirty or not doSync;
-	if (not dirty) {
-		for (int axis = 0; axis < 2; axis++) {
-			for (int fromTo = 0; fromTo < 2; fromTo++) {
-				vector<Bound> &bounds = bound[axis][fromTo];
-
-				int sz = (int)bounds.size();
-				bounds.reserve(bounds.size()+rects.size());
-				for (int j = 0; j < (int)rects.size(); j++) {
-					bounds.push_back(Bound(rects[j][fromTo][axis], index+j));
-				}
-				sort(bounds.begin() + sz, bounds.end());
-				inplace_merge(bounds.begin(), bounds.begin()+sz, bounds.end());
-			}
-		}
+	for (auto r = rects.begin(); r != rects.end(); r++) {
+		box.bound(*r);
 	}
+	dirty = true;
 }
 
-void Layer::push(Poly gon, bool doSync) {
+void Layer::push(Poly gon) {
 	poly.push_back(gon);
+	box.bound(gon);
+	dirty = true;
 }
 
-void Layer::push(vector<Poly> gons, bool doSync) {
+void Layer::push(vector<Poly> gons) {
 	poly.insert(poly.end(), gons.begin(), gons.end());
+	for (auto g = gons.begin(); g != gons.end(); g++) {
+		box.bound(*g);
+	}
+	dirty = true;
 }
 
-void Layer::erase(int idx, bool doSync) {
+void Layer::erase(int idx) {
 	geo.erase(geo.begin()+idx);
-	dirty = dirty or not doSync;
-	if (not dirty) {
-		for (int axis = 0; axis < 2; axis++) {
-			for (int fromTo = 0; fromTo < 2; fromTo++) {
-				vector<Bound> &bounds = bound[axis][fromTo];
-
-				for (int j = (int)bounds.size()-1; j >= 0; j--) {
-					if (bounds[j].idx == idx) {
-						bounds.erase(bounds.begin() + j);
-					} else if (bounds[j].idx > idx) {
-						bounds[j].idx--;
-					}
-				}
-			}
-		}
-	}
+	dirty = true;
 }
 
 void Layer::label(Label lbl) {
@@ -710,26 +739,6 @@ void Layer::label(Label lbl) {
 
 void Layer::label(vector<Label> lbls) {
 	this->lbl.insert(this->lbl.end(), lbls.begin(), lbls.end());
-}
-
-Rect Layer::bbox() const {
-	if (geo.empty()) {
-		return Rect();
-	}
-	
-	bool conflict = false;
-	// DESIGN(edward.bingham) Naive approach first
-	Rect box(geo[0].net, geo[0].ll, geo[0].ur);
-	for (int i = 1; i < (int)geo.size(); i++) {
-		if (box.net < 0 and not conflict) {
-			box.net = geo[i].net;
-		} else if (geo[i].net >= 0 and geo[i].net != box.net) {
-			box.net = -1;
-			conflict = true;
-		}
-		box.bound(geo[i].ll, geo[i].ur);
-	}
-	return box;
 }
 
 void Layer::normalize() {
@@ -742,14 +751,14 @@ void Layer::normalize() {
 	}
 }
 
-Layer &Layer::merge(bool doSync) {
+Layer &Layer::merge() {
 	// TODO use the bounds array to improve performance
 	// TODO(edward.bingham) This fails to fully merge all rectangles if you need
 	// three or more rectangles to form a fully covered rectangle.
 	for (int i = (int)geo.size()-2; i >= 0; i--) {
 		for (int j = (int)geo.size()-1; j > i; j--) {
 			if (geo[i].merge(geo[j])) {
-				erase(j, doSync);
+				erase(j);
 				j = geo.size();
 			}
 		}
@@ -782,6 +791,7 @@ Layer &Layer::shift(vec2i pos, vec2i dir) {
 	for (auto r = geo.begin(); r != geo.end(); r++) {
 		r->shift(pos, dir);
 	}
+	box.shift(pos, dir);
 	dirty = true;
 	return *this;
 }
@@ -908,6 +918,30 @@ bool Layer::overlaps(const Layer &l0) const {
 	return false;
 }
 
+void Layer::print() {
+	printf("layer %s(%d)\n", (draw < 0 ? "" : tech->paint[draw].name.c_str()), draw);
+	int j = 0;
+	for (auto rect = geo.begin(); rect != geo.end(); rect++) {
+		printf("\trect[%d] %d (%d %d) (%d %d)\n", j, rect->net, rect->ll[0], rect->ll[1], rect->ur[0], rect->ur[1]);
+		j++;
+	}
+	j = 0;
+	for (auto gon = poly.begin(); gon != poly.end(); gon++) {
+		printf("\tpoly[%d] %d", j, gon->net);
+		for (auto v = gon->v.begin(); v != gon->v.end(); v++) {
+			printf(" (%d %d)", (*v)[0], (*v)[1]);
+		}
+		printf("\n");
+		j++;
+	}
+	j = 0;
+	for (auto label = lbl.begin(); label != lbl.end(); label++) {
+		printf("\tlabel[%d] %d (%d %d) %s\n", j, label->net, label->pos[0], label->pos[1], label->txt.c_str());
+		j++;
+	}
+}
+
+
 bool operator<(const Layer &l0, const Layer &l1) {
 	return l0.draw < l1.draw;
 }
@@ -925,6 +959,7 @@ Layer operator&(const Layer &l0, const Layer &l1) {
 	//l1.sync();
 
 	Layer result(*l0.tech);
+	result.draw = l0.draw;
 	result.isRouting = l0.isRouting and l1.isRouting;
 	result.isSubstrate = l0.isSubstrate or l1.isSubstrate;
 	result.isPin = l0.isPin or l1.isPin;
@@ -932,16 +967,16 @@ Layer operator&(const Layer &l0, const Layer &l1) {
 	for (auto r0 = l0.geo.begin(); r0 != l0.geo.end(); r0++) {
 		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
 			if (r0->overlaps(*r1)) {
-				int net = -1;
-				if (r0->net < 0 and r1->net >= 0 and not l1.isWell) {
-					net = r1->net;
-				} else if (r0->net >= 0 and not l0.isWell and r1->net < 0) {
-					net = r0->net;
-				} else if (r0->net == r1->net) {
-					net = r0->net;
-				}
+				result.push(Rect(r0->net, max(r0->ll, r1->ll), min(r0->ur, r1->ur)));
+			}
+		}
+	}
 
-				result.push(Rect(net, max(r0->ll, r1->ll), min(r0->ur, r1->ur)));
+	for (auto b0 = l0.lbl.begin(); b0 != l0.lbl.end(); b0++) {
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r1->contains(b0->pos)) {
+				result.label(*b0);
+				break;
 			}
 		}
 	}
@@ -957,14 +992,24 @@ Layer interact(const Layer &l0, const Layer &l1) {
 	result.draw = l0.draw;
 	result.isRouting = l0.isRouting;
 	result.isSubstrate = l0.isSubstrate;
-	for (int i = 0; i < (int)l0.geo.size(); i++) {
-		for (int j = 0; j < (int)l1.geo.size(); j++) {
-			if (l0.geo[i].overlaps(l1.geo[j])) {
-				result.push(l0.geo[i]);
+	for (auto r0 = l0.geo.begin(); r0 != l0.geo.end(); r0++) {
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r0->overlaps(*r1)) {
+				result.push(*r0);
 				break;
 			}
 		}
 	}
+
+	for (auto b0 = l0.lbl.begin(); b0 != l0.lbl.end(); b0++) {
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r1->contains(b0->pos)) {
+				result.label(*b0);
+				break;
+			}
+		}
+	}
+
 	return result;
 }
 
@@ -976,18 +1021,33 @@ Layer not_interact(const Layer &l0, const Layer &l1) {
 	result.draw = l0.draw;
 	result.isRouting = l0.isRouting;
 	result.isSubstrate = l0.isSubstrate;
-	for (int i = 0; i < (int)l0.geo.size(); i++) {
+	
+	for (auto r0 = l0.geo.begin(); r0 != l0.geo.end(); r0++) {
 		bool found = false;
-		for (int j = 0; j < (int)l1.geo.size(); j++) {
-			if (l0.geo[i].overlaps(l1.geo[j])) {
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r0->overlaps(*r1)) {
 				found = true;
 				break;
 			}
 		}
 		if (not found) {
-			result.push(l0.geo[i]);
+			result.push(*r0);
 		}
 	}
+
+	for (auto b0 = l0.lbl.begin(); b0 != l0.lbl.end(); b0++) {
+		bool found = false;
+		for (auto r1 = l1.geo.begin(); r1 != l1.geo.end(); r1++) {
+			if (r1->contains(b0->pos)) {
+				found = true;
+				break;
+			}
+		}
+		if (not found) {
+			result.label(*b0);
+		}
+	}
+
 	return result;
 }
 
@@ -996,11 +1056,14 @@ Layer operator|(const Layer &l0, const Layer &l1) {
 	//l1.sync();
 
 	Layer result(*l0.tech);
+	result.draw = l0.draw;
 	result.isRouting = l0.isRouting and l1.isRouting;
 	result.isSubstrate = l0.isSubstrate or l1.isSubstrate;
 	result.push(l0.geo);
 	result.push(l1.geo);
-	result.merge(true);
+	result.label(l0.lbl);
+	result.label(l1.lbl);
+	result.merge();
 	return result;
 }
 
@@ -1011,6 +1074,7 @@ Layer operator~(const Layer &l) {
 	int hi = std::numeric_limits<int>::max();
 
 	Layer result(*l.tech, true);
+	result.draw = l.draw;
 	result.isRouting = not l.isRouting;
 	result.isSubstrate = not l.isSubstrate;
 	for (int i = 0; i < (int)l.geo.size(); i++) {
@@ -1156,7 +1220,6 @@ bool Net::has(string name) const {
 
 Layout::Layout(const Tech &tech) {
 	this->tech = &tech;
-	this->box = Rect();
 }
 
 Layout::~Layout() {
@@ -1175,36 +1238,274 @@ map<int, Layer>::iterator Layout::at(int draw) {
 	return result.first;
 }
 
-void Layout::push(int layer, Rect rect, bool doSync) {
-	at(layer)->second.push(rect, doSync);
+Layer Layout::get(Level level) {
+	const Material &mat = tech->at(level);
+
+	auto draw = layers.find(mat.draw);
+	auto label = layers.find(mat.label);
+	if (draw == layers.end() and label == layers.end()) {
+		return Layer(*tech);
+	}
+
+	Layer result(*tech);
+	if (label != layers.end()) {
+		result = result | label->second;
+		result.draw = mat.label;
+	}
+	if (draw != layers.end()) {
+		result = result | draw->second;
+		result.draw = mat.draw;
+	}
+
+	for (auto i = mat.mask.begin(); i != mat.mask.end(); i++) {
+		auto mask = layers.find(*i);
+		if (mask == layers.end()) {
+			return Layer(*tech);
+		}
+
+		result = result & mask->second;
+	}
+
+	for (auto i = mat.excl.begin(); i != mat.excl.end(); i++) {
+		auto excl = layers.find(*i);
+		if (excl != layers.end()) {
+			result = result & ~excl->second;
+		}
+	}
+
+	return result;
 }
 
-void Layout::push(int layer, vector<Rect> rects, bool doSync) {
-	at(layer)->second.push(rects, doSync);
+void Layout::push(int layer, Rect rect) {
+	auto pos = at(layer);
+	pos->second.push(rect);
+	box.bound(pos->second.box);
 }
 
-void Layout::push(const Material &mat, Rect rect, bool doSync) {
-	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(rect, doSync);
+void Layout::push(int layer, vector<Rect> rects) {
+	auto pos = at(layer);
+	pos->second.push(rects);
+	box.bound(pos->second.box);
 }
 
-void Layout::push(const Material &mat, vector<Rect> rects, bool doSync) {
-	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(rects, doSync);
+vec2i Layout::push(Level level, Rect rect, int base, int axis) {
+	const Material &mat = tech->at(level);
+
+	int prev = -1;
+	if (mat.hasDraw()) {
+		push(mat.draw, rect);
+		prev = mat.draw;
+	} else {
+		push(mat.label, rect);
+		prev = mat.label;
+	}
+
+	rect.net = -1;
+	vec2i total(0, 0);
+	for (auto curr = mat.mask.begin(); curr != mat.mask.end(); curr++) {
+		if (prev >= 0) {
+			vec2i overhang = max(tech->getEnclosing(*curr, prev), 0);
+			// This is a diffusion, so we want the long dimension along the x-axis to
+			// reduce cell height at the expense of cell length. This reduces total
+			// layout area.
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+
+			total += overhang;
+			rect.grow(overhang);
+		}
+
+		push(*curr, rect);
+		prev = *curr;
+	}
+
+	if (level.type == Level::SUBST) {
+		const Substrate &sub = (const Substrate&)mat;
+		if (sub.well.valid()) {
+			vec2i overhang = max(tech->getEnclosing(tech->at(sub.well).draw, prev), 0);
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+			total += overhang;
+			rect.net = base;
+			rect.grow(overhang);
+			total += push(sub.well, rect, base, axis);
+		}
+	}
+
+	return total;
 }
 
-void Layout::push(int layer, Poly gon, bool doSync) {
-	at(layer)->second.push(gon, doSync);
+vec2i Layout::push(Level level, vector<Rect> rects, int base, int axis) {
+	const Material &mat = tech->at(level);
+
+	int prev = -1;
+	if (mat.hasDraw()) {
+		push(mat.draw, rects);
+		prev = mat.draw;
+	} else {
+		push(mat.label, rects);
+		prev = mat.label;
+	}
+
+	for (auto r = rects.begin(); r != rects.end(); r++) {
+		r->net = -1;
+	}
+	vec2i total(0, 0);
+	for (auto curr = mat.mask.begin(); curr != mat.mask.end(); curr++) {
+		if (prev >= 0) {
+			vec2i overhang = max(tech->getEnclosing(*curr, prev), 0);
+			// This is a diffusion, so we want the long dimension along the x-axis to
+			// reduce cell height at the expense of cell length. This reduces total
+			// layout area.
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+
+			total += overhang;
+			for (auto r = rects.begin(); r != rects.end(); r++) {
+				r->grow(overhang);
+			}
+		}
+
+		push(*curr, rects);
+		prev = *curr;
+	}
+
+	if (level.type == Level::SUBST) {
+		const Substrate &sub = (const Substrate &)mat;
+		if (sub.well.valid()) {
+			vec2i overhang = max(tech->getEnclosing(tech->at(sub.well).draw, prev), 0);
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+			total += overhang;
+			for (auto r = rects.begin(); r != rects.end(); r++) {
+				r->net = base;
+				r->grow(overhang);
+			}
+			total += push(sub.well, rects, base, axis);
+		}
+	}
+
+	return total;
 }
 
-void Layout::push(int layer, vector<Poly> gons, bool doSync) {
-	at(layer)->second.push(gons, doSync);
+void Layout::push(int layer, Poly gon) {
+	auto pos = at(layer);
+	pos->second.push(gon);
+	box.bound(pos->second.box);
 }
 
-void Layout::push(const Material &mat, Poly gon, bool doSync) {
-	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(gon, doSync);
+void Layout::push(int layer, vector<Poly> gons) {
+	auto pos = at(layer);
+	pos->second.push(gons);
+	box.bound(pos->second.box);
 }
 
-void Layout::push(const Material &mat, vector<Poly> gons, bool doSync) {
-	at(mat.draw < 0 ? mat.label : mat.draw)->second.push(gons, doSync);
+vec2i Layout::push(Level level, Poly gon, int base, int axis) {
+	const Material &mat = tech->at(level);
+
+	int prev = -1;
+	if (mat.hasDraw()) {
+		push(mat.draw, gon);
+		prev = mat.draw;
+	} else {
+		push(mat.label, gon);
+		prev = mat.label;
+	}
+
+	gon.net = -1;
+	vec2i total(0, 0);
+	for (auto curr = mat.mask.begin(); curr != mat.mask.end(); curr++) {
+		if (prev >= 0) {
+			vec2i overhang = max(tech->getEnclosing(*curr, prev), 0);
+			// This is a diffusion, so we want the long dimension along the x-axis to
+			// reduce cell height at the expense of cell length. This reduces total
+			// layout area.
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+
+			total += overhang;
+			gon.grow(overhang);
+		}
+
+		push(*curr, gon);
+		prev = *curr;
+	}
+
+	if (level.type == Level::SUBST) {
+		const Substrate &sub = (const Substrate&)mat;
+		if (sub.well.valid()) {
+			vec2i overhang = max(tech->getEnclosing(tech->at(sub.well).draw, prev), 0);
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+			total += overhang;
+			gon.net = base;
+			gon.grow(overhang);
+			total += push(sub.well, gon, base, axis);
+		}
+	}
+
+	return total;
+}
+
+vec2i Layout::push(Level level, vector<Poly> gons, int base, int axis) {
+	const Material &mat = tech->at(level);
+
+	int prev = -1;
+	if (mat.hasDraw()) {
+		push(mat.draw, gons);
+		prev = mat.draw;
+	} else {
+		push(mat.label, gons);
+		prev = mat.label;
+	}
+
+	for (auto g = gons.begin(); g != gons.end(); g++) {
+		g->net = -1;
+	}
+	vec2i total(0, 0);
+	for (auto curr = mat.mask.begin(); curr != mat.mask.end(); curr++) {
+		if (prev >= 0) {
+			vec2i overhang = max(tech->getEnclosing(*curr, prev), 0);
+			// This is a diffusion, so we want the long dimension along the x-axis to
+			// reduce cell height at the expense of cell length. This reduces total
+			// layout area.
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+
+			total += overhang;
+			for (auto g = gons.begin(); g != gons.end(); g++) {
+				g->grow(overhang);
+			}
+		}
+
+		push(*curr, gons);
+		prev = *curr;
+	}
+
+	if (level.type == Level::SUBST) {
+		const Substrate &sub = (const Substrate &)mat;
+		if (sub.well.valid()) {
+			vec2i overhang = max(tech->getEnclosing(tech->at(sub.well).draw, prev), 0);
+			if (axis == 0) {
+				overhang.swap(0,1);
+			}
+			total += overhang;
+			for (auto g = gons.begin(); g != gons.end(); g++) {
+				g->grow(overhang);
+				g->net = base;
+			}
+			total += push(sub.well, gons, base, axis);
+		}
+	}
+
+	return total;
 }
 
 void Layout::label(int layer, Label lbl) {
@@ -1215,11 +1516,13 @@ void Layout::label(int layer, vector<Label> lbls) {
 	at(layer)->second.label(lbls);
 }
 
-void Layout::label(const Material &mat, Label lbl) {
+void Layout::label(Level level, Label lbl) {
+	const Material &mat = tech->at(level);
 	at(mat.label)->second.label(lbl);
 }
 
-void Layout::label(const Material &mat, vector<Label> lbls) {
+void Layout::label(Level level, vector<Label> lbls) {
+	const Material &mat = tech->at(level);
 	at(mat.label)->second.label(lbls);
 }
 
@@ -1234,27 +1537,15 @@ int Layout::netAt(string name) {
 	return result;
 }
 
-Rect Layout::bbox() const {
-	if (layers.empty()) {
-		return Rect();
-	}
-	
-	Rect box = layers.begin()->second.bbox();
-	for (auto i = std::next(layers.begin()); i != layers.end(); i++) {
-		box.bound(i->second.bbox());
-	}
-	return box;
-}
-
 void Layout::normalize() {
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
 		layer->second.normalize();
 	}
 }
 
-void Layout::merge(bool doSync) {
+void Layout::merge() {
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
-		layer->second.merge(doSync);
+		layer->second.merge();
 	}
 }
 
@@ -1305,36 +1596,32 @@ void Layout::trace() {
 
 	printf("looking for via connections\n");*/
 	for (auto via = tech->vias.begin(); via != tech->vias.end(); via++) {
-		const Material *up = tech->atMaterial(via->upLevel);
-		const Material *dn = tech->atMaterial(via->downLevel);
-		if (up == nullptr or dn == nullptr) {
-			printf("error: unable to find connecting layers for via\n");
-			continue;
-		}
+		const Material &up = tech->at(via->up);
+		const Material &dn = tech->at(via->down);
 
 		vector<pair<int, int> > connect = {
-			{dn->draw, via->draw},
-			{dn->pin, via->draw},
-			{dn->draw, via->pin},
-			{dn->pin, via->pin},
-			{via->draw, up->draw},
-			{via->pin, up->draw},
-			{via->draw, up->pin},
-			{via->pin, up->pin},
-			{via->draw, dn->draw},
-			{via->draw, dn->pin},
-			{via->pin, dn->draw},
-			{via->pin, dn->pin},
-			{up->draw, via->draw},
-			{up->draw, via->pin},
-			{up->pin, via->draw},
-			{up->pin, via->pin},
-			{dn->draw, dn->pin},
-			{dn->pin, dn->draw},
+			{dn.draw, via->draw},
+			{dn.pin, via->draw},
+			{dn.draw, via->pin},
+			{dn.pin, via->pin},
+			{via->draw, up.draw},
+			{via->pin, up.draw},
+			{via->draw, up.pin},
+			{via->pin, up.pin},
+			{via->draw, dn.draw},
+			{via->draw, dn.pin},
+			{via->pin, dn.draw},
+			{via->pin, dn.pin},
+			{up.draw, via->draw},
+			{up.draw, via->pin},
+			{up.pin, via->draw},
+			{up.pin, via->pin},
+			{dn.draw, dn.pin},
+			{dn.pin, dn.draw},
 			{via->draw, via->pin},
 			{via->pin, via->draw},
-			{up->draw, up->pin},
-			{up->pin, up->draw},
+			{up.draw, up.pin},
+			{up.pin, up.draw},
 		};
 
 		/*vector<pair<int, int> > connect;
@@ -1534,6 +1821,10 @@ void Layout::trace() {
 	}
 
 	printf("done\n");*/
+}
+
+bool Layout::empty() const {
+	return layers.empty();
 }
 
 void Layout::clear() {
