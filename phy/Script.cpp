@@ -50,7 +50,9 @@ static PyObject* tupleFromLevel(Level level) {
 }
 
 static Level levelFromTuple(PyObject *obj) {
-	if (obj == nullptr or PyTuple_Size(obj) != 2) {
+	if (obj == nullptr) {
+		return Level();
+	} else if (PyTuple_Size(obj) != 2) {
 		PyErr_SetString(PyExc_TypeError, "Level must have 2 elements (type and idx)");
 		return Level();
 	}
@@ -540,6 +542,7 @@ bool loadTech(Tech &dst, string path, string cells) {
 	PyConfig_InitPythonConfig(&config);
 
 	vector<char*> argv;
+	argv.push_back(const_cast<char*>(args[0].c_str()));
 	for (auto arg = args.begin(); arg != args.end(); arg++) {
 		argv.push_back(const_cast<char*>(arg->c_str()));
 	}
