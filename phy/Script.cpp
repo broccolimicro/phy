@@ -8,34 +8,7 @@
 #include <iostream>
 #include <cstdlib>
 
-// Platform-specific includes
-#if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-
-void* dlopen(const char* name, int) {
-    return (void*)LoadLibrary(name);
-}
-
-void dlclose(void* handle) {
-    FreeLibrary((HMODULE)handle);
-}
-
-void* dlsym(void* handle, const char* symbol) {
-    return (void*)GetProcAddress((HMODULE)handle, symbol);
-}
-
-char* dlerror() {
-	DWORD errorCode = GetLastError();
-	static char buffer[2048];
-	size_t size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-								 NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-								 (LPSTR)&buffer, 0, NULL);
-	buffer[size] = '\0';
-	return buffer;
-}
-#else
 #include <dlfcn.h>
-#endif
 
 class PythonLoader {
 public:
