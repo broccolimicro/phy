@@ -9,6 +9,7 @@
 #include <cstdlib>
 
 #include <dlfcn.h>
+#include <fstream>
 
 class PythonLoader {
 public:
@@ -83,13 +84,21 @@ private:
 		vector<string> names = {
 #if defined(_WIN32) || defined(_WIN64)
 			"python315.dll",
+			"libpython3.15.dll",
 			"python314.dll",
+			"libpython3.14.dll",
 			"python313.dll",
+			"libpython3.13.dll",
 			"python312.dll",
+			"libpython3.12.dll",
 			"python311.dll",
+			"libpython3.11.dll",
 			"python310.dll",
+			"libpython3.10.dll",
 			"python309.dll",
+			"libpython3.09.dll",
 			"python3.dll"
+			"libpython3.dll"
 #elif defined(__MACH__) || defined(__APPLE__)
 			"libpython3.15.dylib",
 			"libpython3.14.dylib",
@@ -743,8 +752,10 @@ bool loadTech(Tech &dst, string path, string cells) {
 
 	vector<string> args = splitArguments(path);
 	if (not filesystem::exists(args[0])) {
+		printf("technology file '%s' not found.\n", args[0].c_str());
 		return false;
 	}
+
 	dst.path = args[0];
 	dst.lib = cells;
 
@@ -764,6 +775,7 @@ bool loadTech(Tech &dst, string path, string cells) {
 		if (not Py.Status_IsExit(status)) {
 			Py.ExitStatusException(status);
 		}
+		printf("config argv failed.\n");
 		return false;
 	}
 
@@ -775,16 +787,27 @@ bool loadTech(Tech &dst, string path, string cells) {
 		if (not Py.Status_IsExit(status)) {
 			Py.ExitStatusException(status);
 		}
+		printf("initialize failed.\n");
 		return false;
 	}
 	Py.Config_Clear(&config);
 
 	bool success = true;
+#if defined(_WIN32) || defined(_WIN64)
+	FILE *fptr = fopen(argv[0], "rb");
+#else
 	FILE *fptr = fopen(argv[0], "r");
-	if (fptr != nullptr) {
-		Py.Run_SimpleFile(fptr, argv[0]);
-		fclose(fptr);
-		success = (Py.FinalizeEx() >= 0);
+#endif
+	if (fptr == nullptr) {
+		printf("unable to open file.\n");
+		return false;
+	}
+
+	Py.Run_SimpleFile(fptr, argv[0]);
+	fclose(fptr);
+	success = (Py.FinalizeEx() >= 0);
+	if (not success) {
+		printf("run failed.\n");
 	}
 
 	tech = nullptr;
