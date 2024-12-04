@@ -117,6 +117,15 @@ private:
 			"python310.dll",
 			"python309.dll",
 			"python3.dll"
+#elif defined(__MACH__) || defined(__APPLE__)
+			"libpython3.15.dylib",
+			"libpython3.14.dylib",
+			"libpython3.13.dylib",
+			"libpython3.12.dylib",
+			"libpython3.11.dylib",
+			"libpython3.10.dylib",
+			"libpython3.9.dylib",
+			"libpython3.dylib"
 #else
 			"libpython3.15.so",
 			"libpython3.14.so",
