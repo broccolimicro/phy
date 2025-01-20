@@ -227,6 +227,17 @@ struct Net {
 	bool has(string name) const;
 };
 
+struct Instance {
+	Instance(int macro=-1, vec2i pos=vec2i(0,0), vec2i dir=vec2i(1,1));
+	~Instance();
+
+	int macro;
+	vector<int> ports;
+	
+	vec2i pos;
+	vec2i dir;
+};
+
 struct Layout {
 	// Layout(); we shouldn't be able to create a layout without a pointer to the
 	// technology node specification
@@ -253,6 +264,8 @@ struct Layout {
 
 	// The geometry for this cell
 	map<int, Layer> layers;
+
+	vector<Instance> inst;
 	
 	map<int, Layer>::const_iterator find(int draw) const;
 	map<int, Layer>::iterator find(int draw);

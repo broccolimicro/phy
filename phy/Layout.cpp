@@ -1218,6 +1218,15 @@ bool Net::has(string name) const {
 	return (pos != names.end() and *pos == name);
 }
 
+Instance::Instance(int macro, vec2i pos, vec2i dir) {
+	this->macro = macro;
+	this->pos = pos;
+	this->dir = dir;
+}
+
+Instance::~Instance() {
+}
+
 Layout::Layout(const Tech &tech) {
 	this->tech = &tech;
 }
