@@ -44,6 +44,12 @@ void Rect::normalize() {
 	}
 }
 
+Rect &Rect::shift_inplace(vec2i pos, vec2i dir) {
+	ll = pos+ll*dir;
+	ur = pos+ur*dir;
+	return *this;
+}
+
 Rect Rect::shift(vec2i pos, vec2i dir) const {
 	return Rect(net, pos+ll*dir, pos+ur*dir);
 }
@@ -573,6 +579,13 @@ void Poly::normalize() {
 	}
 }
 
+Poly &Poly::shift_inplace(vec2i pos, vec2i dir) {
+	for (auto i = v.begin(); i != v.end(); i++) {
+		*i = pos+(*i)*dir;
+	}
+	return *this;
+}
+
 void Poly::grow(vec2i d) {
 	// TODO(edward.bingham) implement this
 }
@@ -595,6 +608,11 @@ Label::Label(int net, vec2i pos, string txt) {
 }
 
 Label::~Label() {
+}
+
+Label &Label::shift_inplace(vec2i pos, vec2i dir) {
+	this->pos = pos+this->pos*dir;
+	return *this;
 }
 
 Bound::Bound() {
@@ -787,11 +805,17 @@ Layer Layer::clamp(int axis, int lo, int hi) const {
 	return result;
 }
 
-Layer &Layer::shift(vec2i pos, vec2i dir) {
+Layer &Layer::shift_inplace(vec2i pos, vec2i dir) {
 	for (auto r = geo.begin(); r != geo.end(); r++) {
-		r->shift(pos, dir);
+		r->shift_inplace(pos, dir);
 	}
-	box.shift(pos, dir);
+	for (auto p = poly.begin(); p != poly.end(); p++) {
+		p->shift_inplace(pos, dir);
+	}
+	for (auto l = lbl.begin(); l != lbl.end(); l++) {
+		l->shift_inplace(pos, dir);
+	}
+	box.shift_inplace(pos, dir);
 	dirty = true;
 	return *this;
 }
@@ -1556,6 +1580,18 @@ void Layout::merge() {
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
 		layer->second.merge();
 	}
+}
+
+Layout &Layout::shift_inplace(vec2i pos, vec2i dir) {
+	if (pos[0] == 0 and pos[1] == 0 and dir[0] == 1 and dir[1] == 1) {
+		return *this;
+	}
+
+	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
+		layer->second.shift_inplace(pos, dir);
+	}
+	box.shift_inplace(pos, dir);
+	return *this;
 }
 
 void Layout::trace() {

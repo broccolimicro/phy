@@ -31,6 +31,7 @@ struct Rect {
 	vec2i &operator[](int corner);
 
 	void normalize();
+	Rect &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
 	Rect shift(vec2i pos, vec2i dir=vec2i(1,1)) const;
 	bool merge(Rect r);
 	bool overlaps(Rect r) const;
@@ -80,6 +81,8 @@ struct Poly {
 	bool empty(); 
 	void normalize();
 
+	Poly &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
+
 	void grow(vec2i d);
 	bool shrink(vec2i d);
 };
@@ -92,6 +95,8 @@ struct Label {
 	int net;
 	vec2i pos;
 	string txt;
+
+	Label &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
 };
 
 // is this bound compared along the x or y boundary?
@@ -166,7 +171,7 @@ struct Layer {
 	Layer &merge();
 
 	Layer clamp(int axis, int lo, int hi) const;
-	Layer &shift(vec2i pos, vec2i dir=vec2i(1,1));
+	Layer &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
 
 	Layer &fillSpacing();
 
@@ -292,6 +297,8 @@ struct Layout {
 
 	void normalize();
 	void merge();
+
+	Layout &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
 
 	// trace the geometry to understand the structure of the nets
 	void trace();
