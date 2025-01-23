@@ -47,6 +47,9 @@ struct Rect {
 
 	vec2i center() const;
 	int area() const;
+	int width() const;
+	int height() const;
+	vec2i size() const;
 };
 
 Rect operator&(const Rect &r0, const Rect &r1);

@@ -265,6 +265,18 @@ int Rect::area() const {
 	return (ur[0] - ll[0])*(ur[1] - ll[1]);
 }
 
+int Rect::width() const {
+	return ur[0] - ll[0];
+}
+
+int Rect::height() const {
+	return ur[1] - ll[1];
+}
+
+vec2i Rect::size() const {
+	return ur - ll;
+}
+
 Rect operator&(const Rect &r0, const Rect &r1) {
 	int net = -1;
 	if (r0.net < 0 and r1.net >= 0) {
