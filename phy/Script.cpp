@@ -512,7 +512,7 @@ static PyObject* py_subst(PyObject *self, PyObject *args, PyObject *kwargs) {
 	}
 
 	int result = (int)tech->subst.size();
-	tech->subst.push_back(Substrate(draw, label, pin, levelFromTuple(well), thickness, resistivity));
+	tech->subst.push_back(Substrate(draw, label, pin, -1, levelFromTuple(well), thickness, resistivity));
 	tech->subst.back().mask = mask;
 	tech->subst.back().excl = excl;
 	return tupleFromLevel(Level(Level::SUBST, result));
@@ -523,6 +523,7 @@ static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
 	int draw = -1;
 	int label = -1;
 	int pin = -1;
+	int tap = -1;
 	float thickness = 0.0f;
 	float resistivity = 0.0f;
 
@@ -531,7 +532,7 @@ static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
 	PyObject *pItem;
 	Py_ssize_t n;
 
-	if(!Py.Arg_ParseTupleAndKeywords(args, kwargs, "i|iiO!O!ff:well", StringArgs({"draw", "label", "pin", "mask", "excl", "thick", "resist"}), &draw, &label, &pin, Py.List_Type, &l0, Py.List_Type, &l1, &thickness, &resistivity)) {
+	if(!Py.Arg_ParseTupleAndKeywords(args, kwargs, "i|iiiO!O!ff:well", StringArgs({"draw", "label", "pin", "tap", "mask", "excl", "thick", "resist"}), &draw, &label, &pin, &tap, Py.List_Type, &l0, Py.List_Type, &l1, &thickness, &resistivity)) {
 		return NULL;
 	}
 
@@ -562,7 +563,7 @@ static PyObject* py_well(PyObject *self, PyObject *args, PyObject *kwargs) {
 	}
 
 	int result = (int)tech->subst.size();
-	tech->subst.push_back(Substrate(draw, label, pin, Level(), thickness, resistivity));
+	tech->subst.push_back(Substrate(draw, label, pin, tap, Level(), thickness, resistivity));
 	tech->subst.back().mask = mask;
 	tech->subst.back().excl = excl;
 	return tupleFromLevel(Level(Level::SUBST, result));

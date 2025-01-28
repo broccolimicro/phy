@@ -90,9 +90,10 @@ struct Material {
 // This specifies a diffusion layer for drawing transistors
 struct Substrate : Material {
 	Substrate();
-	Substrate(int draw, int label=-1, int pin=-1, Level well=Level(), float thickness=0.0f, float resistivity=0.0f);
+	Substrate(int draw, int label=-1, int pin=-1, int tap=-1, Level well=Level(), float thickness=0.0f, float resistivity=0.0f);
 	~Substrate();
 
+	int tap;
 	Level well;
 };
 

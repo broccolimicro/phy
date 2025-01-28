@@ -108,7 +108,8 @@ bool Material::hasDraw() const {
 Substrate::Substrate() : Material() {
 }
 
-Substrate::Substrate(int draw, int label, int pin, Level well, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
+Substrate::Substrate(int draw, int label, int pin, int tap, Level well, float thickness, float resistivity) : Material(draw, label, pin, thickness, resistivity) {
+	this->tap = tap;
 	this->well = well;
 }
 
@@ -298,12 +299,12 @@ vec2i Tech::getEnclosing(int l0, int l1) const {
 	if (result < 0) {
 		vector<int> params = rules[flip(result)].params;
 		if ((int)params.size() == 1) {
-			return vec2i(-1, params[0]);
+			return vec2i(std::numeric_limits<int>::min(), params[0]);
 		} else if ((int)params.size() >= 2) {
 			return vec2i(params[0], params[1]);
 		}
 	}
-	return vec2i(-1, -1);
+	return vec2i(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
 }
 
 // -1 means that one of the sides doesn't need to be enclosed (extension)
@@ -312,7 +313,7 @@ int Tech::setEnclosing(int l0, int l1, int lo, int hi) {
 	if (result != std::numeric_limits<int>::max()) {
 		int idx = flip(result);
 		if ((int)rules[idx].params.size() < 2) {
-			rules[idx].params.resize(2, -1);
+			rules[idx].params.resize(2, std::numeric_limits<int>::min());
 		}
 		if (lo > rules[idx].params[0]) {
 			rules[idx].params[0] = lo;
