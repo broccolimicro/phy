@@ -1653,6 +1653,10 @@ void Layout::trace() {
 
 	printf("looking for via connections\n");*/
 	for (auto via = tech->vias.begin(); via != tech->vias.end(); via++) {
+		// don't follow vias to the wells...
+		if (via->down.type == Level::SUBST and not tech->subst[via->down.idx].well.valid()) {
+			continue;
+		}
 		const Material &up = tech->at(via->up);
 		const Material &dn = tech->at(via->down);
 
