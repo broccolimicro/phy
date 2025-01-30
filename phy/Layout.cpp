@@ -963,7 +963,7 @@ bool Layer::overlaps(const Layer &l0) const {
 	return false;
 }
 
-void Layer::print() {
+void Layer::print() const {
 	printf("layer %s(%d)\n", (draw < 0 ? "" : tech->paint[draw].name.c_str()), draw);
 	int j = 0;
 	for (auto rect = geo.begin(); rect != geo.end(); rect++) {
@@ -2045,6 +2045,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 						if (diff > *offset) {
 							*offset = diff;
 							conflict = true;
+							//printf("layers: %d(%d) -> %d(%d)\n", l0.draw, elem.net, l1.draw, stack[1][i].net);
 						}
 						break;
 					}
@@ -2057,6 +2058,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 						if (diff > *offset) {
 							*offset = diff;
 							conflict = true;
+							//printf("layers: %d(%d) -> %d(%d)\n", l0.draw, stack[0][i].net, l1.draw, elem.net);
 						}
 						break;
 					}
@@ -2104,7 +2106,7 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 			//printf("unmatched i1=%d: %s\n", i1->second, tech->print(i1->first).c_str());
 			i1++;
 		} else {
-			//printf("matched rule %d i0=%d i1=%d: %s\n", i0->first, i0->second, i1->second, tech->print(i0->first).c_str());
+			//printf("matched rule %d i0=%d i1=%d\n", i0->first, i0->second, i1->second);
 			const Rule &rule = left.tech->rules[flip(i0->first)];
 
 			if (rule.type == Rule::SPACING) {
@@ -2134,9 +2136,12 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
 						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET, leftMap, rightMap);
 						/*if (newConflict) {
-							printf("found conflict: %d\n", *offset);
+							printf("conflict %d i0=%d e0=%d i1=%d e1=%d off=%d\n", i0->first, i0->second, leftMode, i1->second, rightMode, *offset);
+							//l0.print();
+							//l1.print();
+							//printf("found conflict: %d\n", *offset);
 						} else {
-							printf("no conflict\n");
+							//printf("no conflict\n");
 						}*/
 						conflict = conflict or newConflict;
 					}
@@ -2153,9 +2158,12 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
 						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET, leftMap, rightMap);
 						/*if (newConflict) {
-							printf("found conflict: %d\n", *offset);
+							printf("conflict %d i0=%d e0=%d i1=%d e1=%d off=%d\n", i0->first, i0->second, leftMode, i1->second, rightMode, *offset);
+							//l0.print();
+							//l1.print();
+							//printf("found conflict: %d\n", *offset);
 						} else {
-							printf("no conflict\n");
+							//printf("no conflict\n");
 						}*/
 						conflict = conflict or newConflict;
 					}

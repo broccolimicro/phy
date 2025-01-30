@@ -189,7 +189,7 @@ struct Layer {
 	bool overlaps(const Rect &r0) const;
 	bool overlaps(const Layer &l0) const;
 	
-	void print();
+	void print() const;
 };
 
 bool operator<(const Layer &l0, const Layer &l1);
@@ -321,7 +321,7 @@ struct Layout {
 };
 
 bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true, ucs::mapping l0Map=ucs::mapping(), ucs::mapping l1Map=ucs::mapping());
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true, ucs::mapping leftMap=ucs::mapping(), ucs::mapping rightMap=ucs::mapping());
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true, ucs::mapping leftMap=ucs::mapping(true), ucs::mapping rightMap=ucs::mapping(true));
 
 }
 
