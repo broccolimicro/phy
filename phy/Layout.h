@@ -6,6 +6,8 @@
 #include "vector.h"
 #include "Tech.h"
 
+#include <ucs/mapping.h>
+
 using namespace std;
 
 namespace phy {
@@ -50,6 +52,8 @@ struct Rect {
 	int width() const;
 	int height() const;
 	vec2i size() const;
+
+	Rect map(const ucs::mapping &m) const;
 };
 
 Rect operator&(const Rect &r0, const Rect &r1);
@@ -244,6 +248,8 @@ struct Instance {
 	
 	vec2i pos;
 	vec2i dir;
+
+	Instance &shift_inplace(vec2i pos, vec2i dir=vec2i(1,1));
 };
 
 struct Layout {
@@ -296,6 +302,8 @@ struct Layout {
 	void label(Level level, Label lbl);
 	void label(Level level, vector<Label> lbls);
 
+	void push(Instance inst, Rect box);
+
 	int netAt(string name);
 
 	void normalize();
@@ -312,8 +320,8 @@ struct Layout {
 	void print();
 };
 
-bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true);
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true);
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true, ucs::mapping l0Map=ucs::mapping(), ucs::mapping l1Map=ucs::mapping());
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true, ucs::mapping leftMap=ucs::mapping(), ucs::mapping rightMap=ucs::mapping());
 
 }
 

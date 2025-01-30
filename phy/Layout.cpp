@@ -47,11 +47,14 @@ void Rect::normalize() {
 Rect &Rect::shift_inplace(vec2i pos, vec2i dir) {
 	ll = pos+ll*dir;
 	ur = pos+ur*dir;
+	normalize();
 	return *this;
 }
 
 Rect Rect::shift(vec2i pos, vec2i dir) const {
-	return Rect(net, pos+ll*dir, pos+ur*dir);
+	Rect result(net, pos+ll*dir, pos+ur*dir);
+	result.normalize();
+	return result;
 }
 
 bool Rect::merge(Rect r) {
@@ -275,6 +278,12 @@ int Rect::height() const {
 
 vec2i Rect::size() const {
 	return ur - ll;
+}
+
+Rect Rect::map(const ucs::mapping &m) const {
+	Rect result = *this;
+	result.net = m.map(result.net);
+	return result;
 }
 
 Rect operator&(const Rect &r0, const Rect &r1) {
@@ -1263,6 +1272,12 @@ Instance::Instance(int macro, vec2i pos, vec2i dir) {
 Instance::~Instance() {
 }
 
+Instance &Instance::shift_inplace(vec2i pos, vec2i dir) {
+	this->pos = pos+this->pos*dir;
+	this->dir = this->dir*dir;
+	return *this;
+}
+
 Layout::Layout(const Tech &tech) {
 	this->tech = &tech;
 }
@@ -1571,6 +1586,11 @@ void Layout::label(Level level, vector<Label> lbls) {
 	at(mat.label)->second.label(lbls);
 }
 
+void Layout::push(Instance inst, Rect box) {
+	this->inst.push_back(inst);
+	this->box.bound(box.shift(inst.pos, inst.dir));
+}
+
 int Layout::netAt(string name) {
 	for (int i = 0; i < (int)nets.size(); i++) {
 		if (nets[i].has(name)) {
@@ -1601,6 +1621,9 @@ Layout &Layout::shift_inplace(vec2i pos, vec2i dir) {
 
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
 		layer->second.shift_inplace(pos, dir);
+	}
+	for (auto i = inst.begin(); i != inst.end(); i++) {
+		i->shift_inplace(pos, dir);
 	}
 	box.shift_inplace(pos, dir);
 	return *this;
@@ -1949,7 +1972,7 @@ bool operator<(const StackElem &e0, const StackElem &e1) {
 // along axis at which l0 and l1 abut and save into offset. Require spacing on
 // the opposite axis for non-intersection (default is 0). Return false if the two geometries
 // will never intersect.
-bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet) {
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet, ucs::mapping l0Map, ucs::mapping l1Map) {
 	if (l0.dirty) {
 		l0.sync();
 	}
@@ -1993,7 +2016,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 
 		int boundIdx = idx[minLayer][minFromTo];
 		const Bound &bound = minLayer ? l1.bound[1-axis][minFromTo][boundIdx] : l0.bound[1-axis][minFromTo][boundIdx];
-		Rect rect = minLayer ? l1.geo[bound.idx] : l0.geo[bound.idx];
+		Rect rect = minLayer ? l1.geo[bound.idx].map(l1Map) : l0.geo[bound.idx].map(l0Map);
 
 		// Since we're measuring distance from layer 0 to layer 1, then we need to
 		// look at layer 0's to boundary and layer 1's from boundary. From is index
@@ -2047,7 +2070,8 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 	return conflict;
 }
 
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing) {
+// TODO(edward.bingham) I need to be able to support comparing two cells with net mappings...
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing, ucs::mapping leftMap, ucs::mapping rightMap) {
 	Evaluation e0(left);
 	Evaluation e1(right);
 
@@ -2108,7 +2132,7 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 					//printf("found e0 <-> e1: %d %d\n", leftMode, rightMode);
 
 					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
-						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET);
+						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET, leftMap, rightMap);
 						/*if (newConflict) {
 							printf("found conflict: %d\n", *offset);
 						} else {
@@ -2127,7 +2151,7 @@ bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const L
 					//printf("found e1 <-> e0: %d %d\n", leftMode, rightMode);
 
 					if (leftMode != Layout::IGNORE and rightMode != Layout::IGNORE) {// and (not l0.isFill() or not l1.isFill())) {
-						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET);
+						bool newConflict = minOffset(offset, axis, l0, leftShift, l1, rightShift, spacing, leftMode == Layout::MERGENET and rightMode == Layout::MERGENET, leftMap, rightMap);
 						/*if (newConflict) {
 							printf("found conflict: %d\n", *offset);
 						} else {
