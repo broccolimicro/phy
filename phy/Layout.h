@@ -6,7 +6,7 @@
 #include "vector.h"
 #include "Tech.h"
 
-#include <ucs/mapping.h>
+#include <boolean/mapping.h>
 
 using namespace std;
 
@@ -53,7 +53,7 @@ struct Rect {
 	int height() const;
 	vec2i size() const;
 
-	Rect map(const ucs::mapping &m) const;
+	Rect map(const boolean::mapping &m) const;
 };
 
 Rect operator&(const Rect &r0, const Rect &r1);
@@ -320,8 +320,8 @@ struct Layout {
 	void print();
 };
 
-bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true, ucs::mapping l0Map=ucs::mapping(), ucs::mapping l1Map=ucs::mapping());
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true, ucs::mapping leftMap=ucs::mapping(true), ucs::mapping rightMap=ucs::mapping(true));
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true, boolean::mapping l0Map=boolean::mapping(), boolean::mapping l1Map=boolean::mapping());
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode=Layout::DEFAULT, int routingMode=Layout::DEFAULT, bool horizSpacing=true, boolean::mapping leftMap=boolean::mapping(true), boolean::mapping rightMap=boolean::mapping(true));
 
 }
 

@@ -280,7 +280,7 @@ vec2i Rect::size() const {
 	return ur - ll;
 }
 
-Rect Rect::map(const ucs::mapping &m) const {
+Rect Rect::map(const boolean::mapping &m) const {
 	Rect result = *this;
 	result.net = m.map(result.net);
 	return result;
@@ -1972,7 +1972,7 @@ bool operator<(const StackElem &e0, const StackElem &e1) {
 // along axis at which l0 and l1 abut and save into offset. Require spacing on
 // the opposite axis for non-intersection (default is 0). Return false if the two geometries
 // will never intersect.
-bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet, ucs::mapping l0Map, ucs::mapping l1Map) {
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet, boolean::mapping l0Map, boolean::mapping l1Map) {
 	if (l0.dirty) {
 		l0.sync();
 	}
@@ -2073,7 +2073,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 }
 
 // TODO(edward.bingham) I need to be able to support comparing two cells with net mappings...
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing, ucs::mapping leftMap, ucs::mapping rightMap) {
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing, boolean::mapping leftMap, boolean::mapping rightMap) {
 	Evaluation e0(left);
 	Evaluation e1(right);
 

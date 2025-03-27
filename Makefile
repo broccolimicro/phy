@@ -1,5 +1,5 @@
 NAME          = phy
-DEPEND        = ucs
+DEPEND        = boolean
 
 SRCDIR        = $(NAME)
 TESTDIR       = tests
