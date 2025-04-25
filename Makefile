@@ -1,6 +1,6 @@
 NAME          = phy
-DEPEND        = boolean
-TEST_DEPEND   = boolean
+DEPEND        =
+TEST_DEPEND   =
 
 COVERAGE ?= 0
 

@@ -280,9 +280,15 @@ vec2i Rect::size() const {
 	return ur - ll;
 }
 
-Rect Rect::map(const boolean::mapping &m) const {
+Rect Rect::apply(vector<int> uid_map) const {
 	Rect result = *this;
-	result.net = m.map(result.net);
+	if (not uid_map.empty()) {
+		if (result.net >= 0 and result.net < (int)uid_map.size()) {
+			result.net = uid_map[result.net];
+		} else {
+			result.net = -1;
+		}
+	}
 	return result;
 }
 
@@ -1972,7 +1978,7 @@ bool operator<(const StackElem &e0, const StackElem &e1) {
 // along axis at which l0 and l1 abut and save into offset. Require spacing on
 // the opposite axis for non-intersection (default is 0). Return false if the two geometries
 // will never intersect.
-bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet, boolean::mapping l0Map, boolean::mapping l1Map) {
+bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing, bool mergeNet, vector<int> l0Map, vector<int> l1Map) {
 	if (l0.dirty) {
 		l0.sync();
 	}
@@ -2016,7 +2022,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 
 		int boundIdx = idx[minLayer][minFromTo];
 		const Bound &bound = minLayer ? l1.bound[1-axis][minFromTo][boundIdx] : l0.bound[1-axis][minFromTo][boundIdx];
-		Rect rect = minLayer ? l1.geo[bound.idx].map(l1Map) : l0.geo[bound.idx].map(l0Map);
+		Rect rect = minLayer ? l1.geo[bound.idx].apply(l1Map) : l0.geo[bound.idx].apply(l0Map);
 
 		// Since we're measuring distance from layer 0 to layer 1, then we need to
 		// look at layer 0's to boundary and layer 1's from boundary. From is index
@@ -2073,7 +2079,7 @@ bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer 
 }
 
 // TODO(edward.bingham) I need to be able to support comparing two cells with net mappings...
-bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing, boolean::mapping leftMap, boolean::mapping rightMap) {
+bool minOffset(int *offset, int axis, const Layout &left, int leftShift, const Layout &right, int rightShift, int substrateMode, int routingMode, bool horizSpacing, vector<int> leftMap, vector<int> rightMap) {
 	Evaluation e0(left);
 	Evaluation e1(right);
 
