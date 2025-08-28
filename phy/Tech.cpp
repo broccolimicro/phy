@@ -186,13 +186,20 @@ bool Rule::isOperator() const {
 	return type < Rule::SPACING;
 }
 
-Tech::Tech() {
+Tech::Tech(string path, string lib) {
 	boundary = -1;
 	dbunit = 1.0;
 	scale = 1.0;
+
+	this->path = path;
+	this->lib = lib;
 }
 
 Tech::~Tech() {
+}
+
+bool Tech::isLoaded() const {
+	return not paint.empty();
 }
 
 int Tech::findRule(int type, vector<int> operands) const {

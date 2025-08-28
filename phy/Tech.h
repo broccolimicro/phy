@@ -199,7 +199,7 @@ struct Rule {
 // in the design rules, transistor models, and GDS configuration to enable
 // automated cell layout and design rule checking.
 struct Tech {
-	Tech();
+	Tech(string path="", string lib="");
 	~Tech();
 
 	string path;
@@ -239,6 +239,8 @@ struct Tech {
 	// the list of all DRC rules that we need to check. See Rule for more
 	// information.
 	vector<Rule> rules;
+
+	bool isLoaded() const;
 
 	// layer - paint layers or operations on them
 	// layer < 0 refers to "rules"

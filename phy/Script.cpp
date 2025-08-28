@@ -743,7 +743,7 @@ static PyObject* PyInit_loom()
 	return Py.Module_Create(&EmbModule, PYTHON_API_VERSION);
 }
 
-bool loadTech(Tech &dst, string path, string cells) {
+bool loadTech(Tech &dst) {
 	PythonLoader &Py = PythonLoader::inst();
 	if (not Py) {
 		return false;
@@ -751,14 +751,11 @@ bool loadTech(Tech &dst, string path, string cells) {
 
 	tech = &dst;
 
-	vector<string> args = splitArguments(path);
+	vector<string> args = splitArguments(dst.path);
 	if (not filesystem::exists(args[0])) {
 		printf("technology file '%s' not found.\n", args[0].c_str());
 		return false;
 	}
-
-	dst.path = args[0];
-	dst.lib = cells;
 
 	PyConfig config;
 	Py.Config_InitPythonConfig(&config);
