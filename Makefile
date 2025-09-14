@@ -1,6 +1,6 @@
 NAME          = phy
-DEPEND        =
-TEST_DEPEND   =
+DEPEND        = common
+TEST_DEPEND   = common
 
 COVERAGE ?= 0
 
