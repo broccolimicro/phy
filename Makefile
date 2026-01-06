@@ -12,8 +12,16 @@ CXXFLAGS = -std=c++20 -g -Wall -fmessage-length=0 -O0 --coverage -fprofile-arcs 
 LDFLAGS  = --coverage -fprofile-arcs -ftest-coverage 
 endif
 
+# Python discovery (headers only; no runtime linkage)
+PYTHON ?= python3
+PY_INCLUDES := $(shell $(PYTHON)-config --includes 2>/dev/null)
+
+ifeq ($(PY_INCLUDES),)
+$(warning Could not detect Python includes via $(PYTHON)-config; Python bindings may be disabled)
+endif
+
 SRCDIR        = $(NAME)
-INCLUDE_PATHS = $(DEPEND:%=-I../%) -I../gdstk/include $(shell python3-config --includes) -I.
+INCLUDE_PATHS = $(DEPEND:%=-I../%) -I../gdstk/include $(PY_INCLUDES) -I.
 LIBRARY_PATHS =
 LIBRARIES     =
 
@@ -63,15 +71,6 @@ else
         INCLUDE_PATHS += -I$(shell brew --prefix qhull)/include
         LIBRARY_PATHS += -L../gdstk/build/lib -L$(shell brew --prefix qhull)/lib
         LIBRARIES     += -lgdstk -lclipper -lqhullstatic_r -lz
-        LDFLAGS	      += -Wl,-rpath,/opt/homebrew/opt/python@3.15/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.12/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.10/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3.09/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python@3/Frameworks/Python.framework/Versions/Current/lib \
--Wl,-rpath,/opt/homebrew/opt/python/Frameworks/Python.framework/Versions/Current/lib
     endif
     UNAME_P := $(shell uname -p)
     ifeq ($(UNAME_P),x86_64)
@@ -129,3 +128,7 @@ clean-test:
 
 clean-coverage:
 	rm -rf coverage.info coverage_filtered.info coverage_report *.gcda *.gcno
+
+print-python:
+	@echo "Using PYTHON=$(PYTHON)"
+	@$(PYTHON) --version || true
