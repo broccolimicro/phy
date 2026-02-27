@@ -54,18 +54,6 @@ struct vec
 		va_end(arguments);
 	}
 
-	vec(float first, ...)
-	{
-		va_list arguments;
-		int i;
-
-		va_start(arguments, first);
-		this->elems[0] = (t)first;
-		for (i = 1; i < s; i++)
-			this->elems[i] = (t)va_arg(arguments, double);
-		va_end(arguments);
-	}
-
 	~vec()
 	{
 	}
