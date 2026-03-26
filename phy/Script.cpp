@@ -4,12 +4,15 @@
 #include <Python.h>
 
 #include <filesystem>
+#include <common/text.h>
 
 #include <iostream>
 #include <cstdlib>
 
 #include <dlfcn.h>
 #include <fstream>
+
+#include "Tech.h"
 
 class PythonLoader {
 public:
@@ -188,41 +191,7 @@ private:
 	}
 };
 
-std::vector<std::string> splitArguments(const std::string& input) {
-	std::vector<std::string> args;
-	std::string current;
-	bool inSingleQuotes = false;
-	bool inDoubleQuotes = false;
-	bool inEscape = false;
 
-	for (size_t i = 0; i < input.size(); i++) {
-		char c = input[i];
-
-		if (inEscape) {
-			current += c;
-			inEscape = false;
-		} else if (c == '\\') {
-			inEscape = true;
-		} else if (c == '\'' && !inDoubleQuotes) {
-			inSingleQuotes = !inSingleQuotes;
-		} else if (c == '"' && !inSingleQuotes) {
-			inDoubleQuotes = !inDoubleQuotes;
-		} else if (isspace(c) && !inSingleQuotes && !inDoubleQuotes) {
-			if (!current.empty()) {
-				args.push_back(current);
-				current.clear();
-			}
-		} else {
-			current += c;
-		}
-	}
-
-	if (!current.empty()) {
-		args.push_back(current);
-	}
-
-	return args;
-}
 
 struct StringArgs {
 	char **data;
@@ -743,17 +712,20 @@ static PyObject* PyInit_loom()
 	return Py.Module_Create(&EmbModule, PYTHON_API_VERSION);
 }
 
-bool loadTech(Tech &dst) {
+bool loadTech(void *dst, string path, vector<string> args) {
 	PythonLoader &Py = PythonLoader::inst();
 	if (not Py) {
 		return false;
 	}
 
-	tech = &dst;
+	tech = (Tech*)dst;
 
-	vector<string> args = splitArguments(dst.path);
-	if (not filesystem::exists(args[0])) {
-		printf("technology file '%s' not found.\n", args[0].c_str());
+	if (filesystem::is_directory(path)) {
+		path = escapePath((std::filesystem::path(path) / "tech.py").string());
+	}
+
+	if (not filesystem::exists(path)) {
+		printf("technology file '%s' not found.\n", path.c_str());
 		return false;
 	}
 
@@ -761,7 +733,8 @@ bool loadTech(Tech &dst) {
 	Py.Config_InitPythonConfig(&config);
 
 	vector<char*> argv;
-	argv.push_back(const_cast<char*>(args[0].c_str()));
+	argv.push_back(const_cast<char*>(path.c_str())); // command
+	argv.push_back(const_cast<char*>(path.c_str())); // first argument
 	for (auto arg = args.begin(); arg != args.end(); arg++) {
 		argv.push_back(const_cast<char*>(arg->c_str()));
 	}

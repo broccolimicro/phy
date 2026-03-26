@@ -186,13 +186,10 @@ bool Rule::isOperator() const {
 	return type < Rule::SPACING;
 }
 
-Tech::Tech(string path, string lib) {
+Tech::Tech() {
 	boundary = -1;
 	dbunit = 1.0;
 	scale = 1.0;
-
-	this->path = path;
-	this->lib = lib;
 }
 
 Tech::~Tech() {

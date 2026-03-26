@@ -199,11 +199,8 @@ struct Rule {
 // in the design rules, transistor models, and GDS configuration to enable
 // automated cell layout and design rule checking.
 struct Tech {
-	Tech(string path="", string lib="");
+	Tech();
 	~Tech();
-
-	string path;
-	string lib;
 
 	// Scale of integer units in micrometers for each rectangle
 	// in the Layout.

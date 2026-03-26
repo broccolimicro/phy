@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Tech.h"
+#include <string>
+#include <vector>
 
 namespace phy {
 
-bool loadTech(Tech &dst);
+bool loadTech(void *dst, std::string path, std::vector<std::string> args);
 
 }
