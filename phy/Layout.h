@@ -240,10 +240,10 @@ struct Net {
 };
 
 struct Instance {
-	Instance(int macro=-1, vec2i pos=vec2i(0,0), vec2i dir=vec2i(1,1));
+	Instance(std::string macro="", vec2i pos=vec2i(0,0), vec2i dir=vec2i(1,1));
 	~Instance();
 
-	int macro;
+	std::string macro;
 	vector<int> ports;
 	
 	vec2i pos;
