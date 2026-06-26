@@ -1278,8 +1278,9 @@ Instance &Instance::shift_inplace(vec2i pos, vec2i dir) {
 	return *this;
 }
 
-Layout::Layout(const Tech &tech) {
+Layout::Layout(const Tech &tech, std::string name) {
 	this->tech = &tech;
+	this->name = name;
 }
 
 Layout::~Layout() {
@@ -1918,7 +1919,11 @@ void Layout::clear() {
 	nets.clear();
 }
 
-void Layout::print() {
+void Layout::print() const {
+	printf("Layout: %s [(%d %d) (%d %d)]\n", name.c_str(), box.ll[0], box.ll[1], box.ur[0], box.ur[1]);
+	for (auto i = inst.begin(); i != inst.end(); i++) {
+		printf("instance %s (%d %d) (%d %d)\n", i->macro.c_str(), i->pos[0], i->pos[1], i->dir[0], i->dir[1]);
+	}
 	int i = 0;
 	for (auto layer = layers.begin(); layer != layers.end(); layer++) {
 		printf("layer[%d] %s(%d)\n", i, (layer->second.draw < 0 ? "" : tech->paint[layer->second.draw].name.c_str()), layer->second.draw);
@@ -1943,6 +1948,7 @@ void Layout::print() {
 		}
 		i++;
 	}
+	printf("\n");
 }
 
 struct StackElem {

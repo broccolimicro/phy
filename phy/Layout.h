@@ -255,7 +255,7 @@ struct Instance {
 struct Layout {
 	// Layout(); we shouldn't be able to create a layout without a pointer to the
 	// technology node specification
-	Layout(const Tech &tech);
+	Layout(const Tech &tech, std::string name="");
 	~Layout();
 
 	// used in the minOffset() functions for substrateMode and routingMode
@@ -317,7 +317,7 @@ struct Layout {
 	bool empty() const;
 	void clear();
 
-	void print();
+	void print() const;
 };
 
 bool minOffset(int *offset, int axis, const Layer &l0, int l0Shift, const Layer &l1, int l1Shift, vec2i spacing=vec2i(0,0), bool mergeNet=true, Mapping<int> l0Map=Mapping<int>(-1, true), Mapping<int> l1Map=Mapping<int>(-1, true));
