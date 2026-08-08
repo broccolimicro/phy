@@ -270,6 +270,7 @@ struct Layout {
 
 	// The name of the cell in the cell library
 	string name;
+	map<string, string> properties;
 	// The bounding box of the cell
 	Rect box;
 
