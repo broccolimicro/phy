@@ -702,11 +702,11 @@ static PyMethodDef EmbMethods[] = {
 };
 
 static PyModuleDef EmbModule = {
-	PyModuleDef_HEAD_INIT, "loom", NULL, -1, EmbMethods,
+	PyModuleDef_HEAD_INIT, "bok", NULL, -1, EmbMethods,
 	NULL, NULL, NULL, NULL
 };
 
-static PyObject* PyInit_loom()
+static PyObject* PyInit_bok()
 {
 	PythonLoader &Py = PythonLoader::inst();
 	return Py.Module_Create(&EmbModule, PYTHON_API_VERSION);
@@ -750,7 +750,7 @@ bool loadTech(void *dst, string path, vector<string> args) {
 		return false;
 	}
 
-	Py.Import_AppendInittab("loom", &PyInit_loom);
+	Py.Import_AppendInittab("bok", &PyInit_bok);
 	status = Py.InitializeFromConfig(&config);
 	if (Py.Status_Exception(status)) {
 		tech = nullptr;
